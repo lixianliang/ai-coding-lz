@@ -1,0 +1,36 @@
+{
+    "log_conf": {
+        "level": "debug",
+        "file": "",
+        "access_file": "",
+        "rotation": {
+            "max_size": 100,
+            "max_backups": 10,
+            "max_age": 30,
+            "compress": true,
+            "local_time": true
+        }
+    },
+    "bind_host": ":8000",
+    "api_version": "/v1",
+    "temp": "./temp",
+    "db": {
+        "host": "localhost",
+        "port": 3306,
+        "user": "root",
+        "password": "123456",
+        "database": "imgagent",
+        "enable_log": true
+    },
+    "redis": {
+        "disable_cluster": true,
+        "expire_secs": 60,
+        "addrs": ["10.212.225.135:6379"]
+    },
+    "storage": {
+        "bucket" : "bucket1",
+        "domain" : "bucket1.com",
+        "ak" : "xxx",
+        "sk" : "xx"
+    }
+}
