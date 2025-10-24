@@ -2,7 +2,6 @@ package api
 
 type CreateDocumentArgs struct {
 	Name string `json:"name" binding:"required,max=50"`
-	URL  string `json:"url" binding:"required,max=200"`
 }
 
 type UpdateDocumentArgs struct {

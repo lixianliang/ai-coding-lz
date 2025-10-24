@@ -35,24 +35,26 @@ func (s *Service) HandleCreateDocument(c *gin.Context) {
 	ctx := c.Request.Context()
 	log := logger.FromGinContext(c)
 
-	datasetID := c.Param("dataset_id")
-	if datasetID == "" {
-		hutil.AbortError(c, http.StatusBadRequest, "invalid dataset id")
+	name := c.PostForm("name")
+	if name == "" {
+		hutil.AbortError(c, http.StatusBadRequest, "name is required")
+		return
+	}
+	if len(name) > 50 {
+		hutil.AbortError(c, http.StatusBadRequest, "name exceeds maximum length of 50")
 		return
 	}
 
-	var args api.CreateDocumentArgs
-	err := c.ShouldBindJSON(&args)
+	file, err := c.FormFile("file")
 	if err != nil {
-		log.Errorf("Invalid request body, err: %v", err)
-		hutil.AbortError(c, http.StatusBadRequest, "invalid request body")
+		log.Errorf("Failed to get file, err: %v", err)
+		hutil.AbortError(c, http.StatusBadRequest, "file is required")
 		return
 	}
 
-	log.Infof("Create document, args: %v", args)
+	log.Infof("Create document, name: %s, file: %s", name, file.Filename)
 
-	// 判断名称是否存在，避免出现同样的文档
-	_, err = s.db.GetDocumentWithName(ctx, datasetID, args.Name)
+	_, err = s.db.GetDocumentWithName(ctx, "", name)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Errorf("Failed to get document, err: %v", err)
@@ -65,19 +67,24 @@ func (s *Service) HandleCreateDocument(c *gin.Context) {
 		return
 	}
 
-	_, err = url.ParseRequestURI(args.URL)
-	if err != nil {
-		args.URL = s.stg.MakeURL(args.URL)
+	index := strings.LastIndex(file.Filename, ".")
+	if index == -1 {
+		hutil.AbortError(c, http.StatusBadRequest, "file has no extension")
+		return
 	}
-	filename, err := s.downloadFile(ctx, args.URL)
+	ext := file.Filename[index+1:]
+	id := uuid.New()
+	uid := hex.EncodeToString(id[:])
+	filename := s.conf.Temp + "/" + uid + "." + ext
+
+	err = c.SaveUploadedFile(file, filename)
 	if err != nil {
-		log.Errorf("Failed download url %s, err: %v", args.URL, err)
-		hutil.AbortError(c, hutil.ErrServerInternalCode, "download url failed")
+		log.Errorf("Failed to save file, err: %v", err)
+		hutil.AbortError(c, hutil.ErrServerInternalCode, "save file failed")
 		return
 	}
 	defer os.Remove(filename)
 
-	// 文本分割，设置 10% 的叠加率
 	chunkOverlap := 100
 	texts, err := spliter.Split(ctx, filename, spliter.Option{
 		ChunkSize:    2000,
@@ -97,7 +104,11 @@ func (s *Service) HandleCreateDocument(c *gin.Context) {
 		hutil.AbortError(c, hutil.ErrServerInternalCode, "create Chapters failed")
 		return
 	}
-	doc, err := s.db.CreateDocument(ctx, datasetID, docID, &args)
+
+	args := &api.CreateDocumentArgs{
+		Name: name,
+	}
+	doc, err := s.db.CreateDocument(ctx, "", docID, args)
 	if err != nil {
 		log.Errorf("Failed to create document, err: %v", err)
 		documentErr(c, err, "create document failed")
@@ -131,14 +142,8 @@ func (s *Service) HandleGetDocument(c *gin.Context) {
 func (s *Service) HandleUpdateDocument(c *gin.Context) {
 	ctx := c.Request.Context()
 	log := logger.FromGinContext(c)
-	//ui := GetUserInfo(c)
 
-	datasetID := c.Param("dataset_id")
 	docID := c.Param("document_id")
-	if datasetID == "" {
-		hutil.AbortError(c, http.StatusBadRequest, "invalid dataset id")
-		return
-	}
 	if docID == "" {
 		hutil.AbortError(c, http.StatusBadRequest, "invalid doc id")
 		return
@@ -150,7 +155,7 @@ func (s *Service) HandleUpdateDocument(c *gin.Context) {
 		return
 	}
 
-	log.Infof("Get document, docID: %s", docID)
+	log.Infof("Update document, docID: %s", docID)
 	if err := s.db.UpdateDocument(ctx, docID, &args); err != nil {
 		log.Errorf("Failed update document failed, id: %s, err: %v", docID, err)
 		documentErr(c, err, "update document failed")
