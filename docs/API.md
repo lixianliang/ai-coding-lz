@@ -18,31 +18,31 @@
 
 ```
 POST /v1/documents
+
+Content-Type: multipart/form-data
 ```
 
 **请求体**
 
 ```json
-{
-  "name": "文档名称",
-  "url": "文档URL或存储路径"
-}
+--form 'name="名字"'
+--form 'file=@example-file'
 ```
 
 **字段说明**
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| name | string | 是 | 文档名称，最大长度50字符，同一数据集内名称唯一 |
-| url | string | 是 | 文档URL或存储路径，最大长度200字符 |
+| 字段   | 类型     | 必填 | 说明                    |
+|------|--------|------|-----------------------|
+| name | string | 是 | 名称，最大长度50字符|
+| file | file   | 是 | 本地文件                  |
 
 **响应**
 
 ```json
 {
   "id": "文档ID",
-  "name": "文档名称",
-  "status": "indexing",
+  "name": "名称",
+  "status": "inited",
   "created_at": "2024-10-24 12:00:00",
   "updated_at": "2024-10-24 12:00:00"
 }
@@ -56,11 +56,7 @@ POST /v1/documents
 
 **说明**
 
-- 文档创建后会自动进行文本分割，分割参数：
-  - chunk_size: 2000
-  - chunk_overlap: 100
-  - separator: "\n\n"
-- 文档初始状态为 `indexing`，处理完成后变为 `ready`
+- 文档初始状态为 `inited`，完成场景处理提取则状态变为 `ready`
 
 ---
 
@@ -208,7 +204,7 @@ GET /v1/documents
     {
       "id": "文档ID2",
       "name": "文档名称2",
-      "status": "indexing",
+      "status": "inited",
       "created_at": "2024-10-24 13:00:00",
       "updated_at": "2024-10-24 13:00:00"
     }
@@ -226,7 +222,7 @@ GET /v1/documents
 
 ---
 
-### 章节管理 (Chapters)
+### 章节管理 (chapters)
 
 #### 6. 获取章节详情
 
@@ -235,7 +231,7 @@ GET /v1/documents
 **请求**
 
 ```
-GET /v1/documents/:document_id/Chapters/:id
+GET /v1/documents/:document_id/chapters/:id
 ```
 
 **路径参数**
@@ -273,7 +269,7 @@ GET /v1/documents/:document_id/Chapters/:id
 **请求**
 
 ```
-PUT /v1/documents/:document_id/Chapters/:id
+PUT /v1/documents/:document_id/chapters/:id
 ```
 
 **路径参数**
@@ -325,7 +321,7 @@ PUT /v1/documents/:document_id/Chapters/:id
 **请求**
 
 ```
-DELETE /v1/documents/:document_id/Chapters/:id
+DELETE /v1/documents/:document_id/chapters/:id
 ```
 
 **路径参数**
@@ -356,7 +352,7 @@ null
 **请求**
 
 ```
-GET /v1/documents/:document_id/Chapters
+GET /v1/documents/:document_id/chapters
 ```
 
 **路径参数**
@@ -410,7 +406,7 @@ GET /v1/documents/:document_id/Chapters
 |------|------|------|
 | id | string | 文档唯一标识，32位UUID |
 | name | string | 文档名称，最大128字符 |
-| status | string | 文档状态：`indexing` (索引中) 或 `ready` (就绪) |
+| status | string | 文档状态：`inited` (索引中) 或 `ready` (就绪) |
 | created_at | string | 创建时间，格式：YYYY-MM-DD HH:MM:SS |
 | updated_at | string | 更新时间，格式：YYYY-MM-DD HH:MM:SS |
 
@@ -439,119 +435,3 @@ GET /v1/documents/:document_id/Chapters
 | 614 | 文档已存在 |
 
 ---
-
-## 配置说明
-
-服务配置文件为 `imgagent.json`，主要配置项包括：
-
-```json
-{
-  "log_conf": {
-    "level": "debug",
-    "file": "",
-    "access_file": ""
-  },
-  "bind_host": ":8000",
-  "api_version": "/v1",
-  "temp": "./temp",
-  "db": {
-    "host": "localhost",
-    "port": 3306,
-    "user": "root",
-    "password": "123456",
-    "database": "imgagent"
-  },
-  "redis": {
-    "disable_cluster": true,
-    "expire_secs": 60,
-    "addrs": ["localhost:6379"]
-  },
-  "storage": {
-    "bucket": "bucket1",
-    "domain": "bucket1.com",
-    "ak": "xxx",
-    "sk": "xxx"
-  }
-}
-```
-
-### 配置项说明
-
-- **log_conf**: 日志配置
-  - `level`: 日志级别 (debug/info/warn/error)
-  - `file`: 日志文件路径
-  - `access_file`: 访问日志文件路径
-
-- **bind_host**: 服务监听地址和端口
-
-- **api_version**: API版本前缀
-
-- **temp**: 临时文件存储目录
-
-- **db**: 数据库配置
-  - 支持 MySQL 和 SQLite
-
-- **redis**: Redis配置
-  - 用于缓存，过期时间默认120秒
-
-- **storage**: 对象存储配置
-  - 用于存储文档文件
-
----
-
-## 使用示例
-
-### 创建文档
-
-```bash
-curl -X POST http://localhost:8000/v1/documents \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "测试文档",
-    "url": "https://example.com/document.txt"
-  }'
-```
-
-### 获取文档列表
-
-```bash
-curl http://localhost:8000/v1/documents
-```
-
-### 获取文档详情
-
-```bash
-curl http://localhost:8000/v1/documents/{document_id}
-```
-
-### 更新文档
-
-```bash
-curl -X PUT http://localhost:8000/v1/documents/{document_id} \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "新文档名称"
-  }'
-```
-
-### 删除文档
-
-```bash
-curl -X DELETE http://localhost:8000/v1/documents/{document_id}
-```
-
-### 获取章节列表
-
-```bash
-curl http://localhost:8000/v1/documents/{document_id}/Chapters
-```
-
-### 更新章节
-
-```bash
-curl -X PUT http://localhost:8000/v1/documents/{document_id}/Chapters/{id} \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "更新后的章节内容"
-  }'
-```

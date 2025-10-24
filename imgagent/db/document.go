@@ -12,8 +12,8 @@ import (
 const (
 	batchSize = 100
 
-	DocumentStatusIndexing = "indexing"
-	DocumentStatusReady    = "ready"
+	DocumentStatusInited = "inited"
+	DocumentStatusReady  = "ready"
 )
 
 // Document 文档表
@@ -54,7 +54,7 @@ func (db *Database) CreateDocument(ctx context.Context, datasetID, docID string,
 		ID:        docID,
 		Name:      args.Name,
 		URL:       args.URL,
-		Status:    DocumentStatusIndexing,
+		Status:    DocumentStatusInited,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -113,7 +113,7 @@ func (db *Database) CountDocument(ctx context.Context, datasetID string) (int64,
 }
 
 func (db *Database) ListIndexingDocuments(ctx context.Context) ([]Document, error) {
-	return gorm.G[Document](db.db).Where("status = ?", DocumentStatusIndexing).Find(ctx)
+	return gorm.G[Document](db.db).Where("status = ?", DocumentStatusInited).Find(ctx)
 }
 
 // ===== Chapter DAO =====
