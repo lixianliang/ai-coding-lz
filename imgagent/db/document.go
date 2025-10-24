@@ -53,7 +53,6 @@ func (db *Database) CreateDocument(ctx context.Context, datasetID, docID string,
 	doc := Document{
 		ID:        docID,
 		Name:      args.Name,
-		URL:       args.URL,
 		Status:    DocumentStatusInited,
 		CreatedAt: now,
 		UpdatedAt: now,

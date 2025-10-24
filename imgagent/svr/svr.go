@@ -99,9 +99,9 @@ func (s *Service) RegisterRouter(writer io.Writer) *gin.Engine {
 	authGroup.PUT("/documents/:document_id", s.HandleUpdateDocument)
 	authGroup.DELETE("/documents/:document_id", s.HandleDeleteDocument)
 	authGroup.GET("/documents", s.HandleListDocuments)
-	authGroup.GET("/documents/:document_id/Chapters/:id", s.HandleGetChapter)
-	authGroup.PUT("/documents/:document_id/Chapters/:id", s.HandleUpdateChapter)
-	authGroup.DELETE("/documents/:document_id/Chapters/:id", s.HandleDeleteChapter)
-	authGroup.GET("/documents/:document_id/Chapters", s.HandleListChapters)
+	authGroup.GET("/documents/:document_id/chapters/:id", s.HandleGetChapter)
+	authGroup.PUT("/documents/:document_id/chapters/:id", s.HandleUpdateChapter)
+	authGroup.DELETE("/documents/:document_id/chapters/:id", s.HandleDeleteChapter)
+	authGroup.GET("/documents/:document_id/chapters", s.HandleListChapters)
 	return router
 }
