@@ -21,12 +21,14 @@ type ListDocumentsResult struct {
 }
 
 type Chapter struct {
-	ID         string `json:"id"`
-	Index      int    `json:"index"`
-	DocumentID string `json:"document_id"`
-	Content    string `json:"content"`
-	CreatedAt  string `json:"created_at"`
-	UpdatedAt  string `json:"updated_at"`
+	ID         string   `json:"id"`
+	Index      int      `json:"index"`
+	DocumentID string   `json:"document_id"`
+	Title      string   `json:"title"`
+	Content    string   `json:"content"`
+	SceneIDs   []string `json:"scene_ids"`
+	CreatedAt  string   `json:"created_at"`
+	UpdatedAt  string   `json:"updated_at"`
 }
 
 type UpdateChapterArgs struct {
@@ -34,7 +36,7 @@ type UpdateChapterArgs struct {
 }
 
 type ListChaptersResult struct {
-	Chapters []Chapter `json:"Chapters"`
+	Chapters []Chapter `json:"chapters"`
 }
 
 type Records struct {

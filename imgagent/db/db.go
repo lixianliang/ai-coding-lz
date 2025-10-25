@@ -25,7 +25,7 @@ func NewDatabase(conf dbutil.Config) (*Database, error) {
 	}
 
 	// 这里可以添加表创建逻辑，需要指定字符集为 utf8mb4，默认为 utf8mb3
-	err = db.Set("gorm:table_options", "CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci").AutoMigrate(&Document{}, &Chapter{})
+	err = db.Set("gorm:table_options", "CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci").AutoMigrate(&Document{}, &Chapter{}, &Scene{}, &Role{})
 
 	if err != nil {
 		zap.S().Errorf("Failed to auto migrate, err: %v", err)
