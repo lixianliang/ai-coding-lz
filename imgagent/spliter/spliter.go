@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -120,6 +121,15 @@ func Split(ctx context.Context, filename string, opt Option) ([]string, error) {
 func splitText(ctx context.Context, splitter textsplitter.TextSplitter, content string, separator string, chunkSize int) ([]string, error) {
 	log := logger.FromContext(ctx)
 
+	// 优先按章节分割
+	chapterChunks := splitByChapters(ctx, content)
+	if len(chapterChunks) > 1 {
+		log.Infof("按章节分割成功，共 %d 个章节", len(chapterChunks))
+		return chapterChunks, nil
+	}
+
+	// 如果章节分割失败，使用传统方式分割
+	log.Infof("章节分割失败，使用传统方式分割")
 	finalChunks := make([]string, 0)
 	sep := "\n\n"
 	if separator == "\n" {
@@ -150,4 +160,96 @@ func splitText(ctx context.Context, splitter textsplitter.TextSplitter, content 
 		finalChunks = append(finalChunks, split)
 	}
 	return finalChunks, nil
+}
+
+// splitByChapters 按章节分割文本
+func splitByChapters(ctx context.Context, content string) []string {
+	log := logger.FromContext(ctx)
+
+	// 定义章节匹配的正则表达式
+	chapterPatterns := []string{
+		// 第X章、第X回、第X节
+		`(?i)(第[一二三四五六七八九十百千万\d]+[章节回节])`,
+		// 第X章 标题
+		`(?i)(第[一二三四五六七八九十百千万\d]+章\s*[^\n]*)`,
+		// 第X回 标题
+		`(?i)(第[一二三四五六七八九十百千万\d]+回\s*[^\n]*)`,
+		// 第X节 标题
+		`(?i)(第[一二三四五六七八九十百千万\d]+节\s*[^\n]*)`,
+		// 数字章节
+		`(?i)(第\d+[章节回节])`,
+		// 纯数字章节
+		`(?i)(第\d+章\s*[^\n]*)`,
+		// 英文章节
+		`(?i)(Chapter\s+\d+)`,
+		// 罗马数字章节
+		`(?i)(第[IVX]+[章节回节])`,
+	}
+
+	var chapterRegex *regexp.Regexp
+	var bestPattern string
+
+	// 尝试不同的章节模式，找到匹配最多的
+	maxMatches := 0
+	for _, pattern := range chapterPatterns {
+		regex, err := regexp.Compile(pattern)
+		if err != nil {
+			continue
+		}
+
+		matches := regex.FindAllString(content, -1)
+		if len(matches) > maxMatches {
+			maxMatches = len(matches)
+			chapterRegex = regex
+			bestPattern = pattern
+		}
+	}
+
+	// 如果找到章节模式且匹配数量大于1，进行分割
+	if chapterRegex != nil && maxMatches > 1 {
+		log.Infof("找到章节模式: %s，匹配到 %d 个章节", bestPattern, maxMatches)
+
+		// 打印所有匹配的章节标题
+		matches := chapterRegex.FindAllString(content, -1)
+		for i, match := range matches {
+			log.Infof("章节 %d: %s", i+1, strings.TrimSpace(match))
+		}
+
+		// 按章节分割 - 简单直接的方法
+		// 找到所有章节标题的位置
+		indices := chapterRegex.FindAllStringIndex(content, -1)
+		var result []string
+
+		log.Infof("找到 %d 个章节标题位置", len(indices))
+		for i, idx := range indices {
+			log.Infof("章节 %d 位置: %d-%d, 内容: %s", i+1, idx[0], idx[1], content[idx[0]:idx[1]])
+		}
+
+		if len(indices) == 0 {
+			return []string{content}
+		}
+
+		// 从第一个章节标题开始分割
+		start := indices[0][0]
+		for i := 0; i < len(indices); i++ {
+			var end int
+			if i+1 < len(indices) {
+				end = indices[i+1][0] // 下一个章节标题开始位置
+			} else {
+				end = len(content) // 最后一个章节到结尾
+			}
+
+			chapter := strings.TrimSpace(content[start:end])
+			log.Infof("章节 %d: 位置 %d-%d, 内容: %s", i+1, start, end, chapter[:min(50, len(chapter))])
+			if chapter != "" {
+				result = append(result, chapter)
+			}
+			start = end
+		}
+
+		return result
+	}
+
+	log.Infof("未找到有效的章节模式，匹配数量: %d", maxMatches)
+	return []string{content}
 }
