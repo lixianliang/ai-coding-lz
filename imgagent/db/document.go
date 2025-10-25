@@ -48,7 +48,7 @@ func (Chapter) TableName() string {
 
 // ===== Document DAO =====
 
-func (db *Database) CreateDocument(ctx context.Context, datasetID, docID string, args *api.CreateDocumentArgs) (*Document, error) {
+func (db *Database) CreateDocument(ctx context.Context, docID string, args *api.CreateDocumentArgs) (*Document, error) {
 	now := time.Now()
 	doc := Document{
 		ID:        docID,
@@ -67,8 +67,8 @@ func (db *Database) GetDocument(ctx context.Context, id string) (Document, error
 	return gorm.G[Document](db.db).Where("id = ?", id).Take(ctx)
 }
 
-func (db *Database) GetDocumentWithName(ctx context.Context, datasetID string, name string) (Document, error) {
-	return gorm.G[Document](db.db).Where("dataset_id = ? AND name = ?", datasetID, name).Take(ctx)
+func (db *Database) GetDocumentWithName(ctx context.Context, name string) (Document, error) {
+	return gorm.G[Document](db.db).Where("name = ?", name).Take(ctx)
 }
 
 func (db *Database) UpdateDocument(ctx context.Context, id string, args *api.UpdateDocumentArgs) error {
@@ -103,17 +103,14 @@ func (db *Database) DeleteDocument(ctx context.Context, id string) error {
 	return err
 }
 
-func (db *Database) ListDocuments(ctx context.Context, datasetID string) ([]Document, error) {
-	return gorm.G[Document](db.db).Where("dataset_id = ?", datasetID).Order("updated_at DESC").Find(ctx)
+func (db *Database) ListDocuments(ctx context.Context) ([]Document, error) {
+	return gorm.G[Document](db.db).Order("updated_at DESC").Find(ctx)
 }
 
-func (db *Database) CountDocument(ctx context.Context, datasetID string) (int64, error) {
-	return gorm.G[Document](db.db).Where("dataset_id = ?", datasetID).Count(ctx, "")
-}
-
+/*
 func (db *Database) ListIndexingDocuments(ctx context.Context) ([]Document, error) {
 	return gorm.G[Document](db.db).Where("status = ?", DocumentStatusInited).Find(ctx)
-}
+}*/
 
 // ===== Chapter DAO =====
 
