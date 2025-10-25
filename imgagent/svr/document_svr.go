@@ -54,7 +54,7 @@ func (s *Service) HandleCreateDocument(c *gin.Context) {
 
 	log.Infof("Create document, name: %s, file: %s", name, file.Filename)
 
-	_, err = s.db.GetDocumentWithName(ctx, "", name)
+	_, err = s.db.GetDocumentWithName(ctx, name)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Errorf("Failed to get document, err: %v", err)
@@ -108,7 +108,7 @@ func (s *Service) HandleCreateDocument(c *gin.Context) {
 	args := &api.CreateDocumentArgs{
 		Name: name,
 	}
-	doc, err := s.db.CreateDocument(ctx, "", docID, args)
+	doc, err := s.db.CreateDocument(ctx, docID, args)
 	if err != nil {
 		log.Errorf("Failed to create document, err: %v", err)
 		documentErr(c, err, "create document failed")
@@ -203,7 +203,7 @@ func (s *Service) HandleListDocuments(c *gin.Context) {
 	// ui := GetUserInfo(c)
 
 	log.Infof("List documents")
-	docs, err := s.db.ListDocuments(ctx, "")
+	docs, err := s.db.ListDocuments(ctx)
 	if err != nil {
 		log.Errorf("Failed to list documents, err: %v", err)
 		hutil.AbortError(c, hutil.ErrServerInternalCode, "list documents failed")
