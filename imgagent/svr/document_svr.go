@@ -73,31 +73,42 @@ func (s *Service) HandleCreateDocument(c *gin.Context) {
 		return
 	}
 	ext := file.Filename[index+1:]
-	id := uuid.New()
-	uid := hex.EncodeToString(id[:])
-	filename := s.conf.Temp + "/" + uid + "." + ext
 
-	err = c.SaveUploadedFile(file, filename)
+	// 生成文档 ID
+	docID := db.MakeUUID()
+
+	// 保存临时文件用于分割
+	tempFilename := s.conf.Temp + "/" + docID + "_temp." + ext
+	err = c.SaveUploadedFile(file, tempFilename)
 	if err != nil {
-		log.Errorf("Failed to save file, err: %v", err)
+		log.Errorf("Failed to save temp file, err: %v", err)
 		hutil.AbortError(c, hutil.ErrServerInternalCode, "save file failed")
 		return
 	}
-	defer os.Remove(filename)
+	defer os.Remove(tempFilename) // 临时文件使用后删除
+
+	// 保存永久文件（用于后续上传到百炼）
+	permanentFilename := s.conf.Temp + "/" + docID + "." + ext
+	err = c.SaveUploadedFile(file, permanentFilename)
+	if err != nil {
+		log.Errorf("Failed to save permanent file, err: %v", err)
+		hutil.AbortError(c, hutil.ErrServerInternalCode, "save file failed")
+		return
+	}
 
 	chunkOverlap := 100
-	texts, err := spliter.Split(ctx, filename, spliter.Option{
+	texts, err := spliter.Split(ctx, tempFilename, spliter.Option{
 		ChunkSize:    2000,
 		ChunkOverlap: chunkOverlap,
 		Separator:    "\n\n",
 	})
 	if err != nil {
 		log.Errorf("Failed to split text, err: %v", err)
+		os.Remove(permanentFilename) // 清理永久文件
 		hutil.AbortError(c, hutil.ErrServerInternalCode, "split text failed")
 		return
 	}
 
-	docID := db.MakeUUID()
 	err = s.db.CreateChapters(ctx, docID, texts)
 	if err != nil {
 		log.Errorf("Failed to create Chapters, err: %v", err)
@@ -349,7 +360,9 @@ func makeChapter(d *db.Chapter) api.Chapter {
 		ID:         d.ID,
 		DocumentID: d.DocumentID,
 		Index:      d.Index,
+		Title:      d.Title,
 		Content:    d.Content,
+		SceneIDs:   d.SceneIDs,
 		CreatedAt:  d.CreatedAt.Format(time.DateTime),
 		UpdatedAt:  d.UpdatedAt.Format(time.DateTime),
 	}
@@ -415,4 +428,109 @@ func (s *Service) downloadFile(ctx context.Context, textURL string) (string, err
 
 	log.Infof("Download url %s, filename: %s, n: %d", textURL, filename, n)
 	return filename, nil
+}
+
+// HandleGetRoles 获取文档的角色列表
+func (s *Service) HandleGetRoles(c *gin.Context) {
+	ctx := c.Request.Context()
+	log := logger.FromGinContext(c)
+
+	docID := c.Param("document_id")
+	if docID == "" {
+		hutil.AbortError(c, http.StatusBadRequest, "invalid doc id")
+		return
+	}
+
+	log.Infof("Get roles, docID: %s", docID)
+	roles, err := s.db.ListRolesByDocument(ctx, docID)
+	if err != nil {
+		log.Errorf("Failed to list roles, err: %v", err)
+		hutil.AbortError(c, http.StatusInternalServerError, "list roles failed")
+		return
+	}
+
+	result := &api.ListRolesResult{}
+	for _, role := range roles {
+		result.Roles = append(result.Roles, makeRole(&role))
+	}
+	hutil.WriteData(c, result)
+}
+
+// HandleListScenesByDocument 获取文档的所有场景
+func (s *Service) HandleListScenesByDocument(c *gin.Context) {
+	ctx := c.Request.Context()
+	log := logger.FromGinContext(c)
+
+	docID := c.Param("document_id")
+	if docID == "" {
+		hutil.AbortError(c, http.StatusBadRequest, "invalid doc id")
+		return
+	}
+
+	log.Infof("List scenes by document, docID: %s", docID)
+	scenes, err := s.db.ListScenesByDocument(ctx, docID)
+	if err != nil {
+		log.Errorf("Failed to list scenes, err: %v", err)
+		hutil.AbortError(c, http.StatusInternalServerError, "list scenes failed")
+		return
+	}
+
+	result := &api.ListScenesResult{}
+	for _, scene := range scenes {
+		result.Scenes = append(result.Scenes, makeScene(&scene))
+	}
+	hutil.WriteData(c, result)
+}
+
+// HandleListScenesByChapter 获取章节的场景列表
+func (s *Service) HandleListScenesByChapter(c *gin.Context) {
+	ctx := c.Request.Context()
+	log := logger.FromGinContext(c)
+
+	chapterID := c.Param("chapter_id")
+	if chapterID == "" {
+		hutil.AbortError(c, http.StatusBadRequest, "invalid chapter id")
+		return
+	}
+
+	log.Infof("List scenes by chapter, chapterID: %s", chapterID)
+	scenes, err := s.db.ListScenesByChapter(ctx, chapterID)
+	if err != nil {
+		log.Errorf("Failed to list scenes, err: %v", err)
+		hutil.AbortError(c, http.StatusInternalServerError, "list scenes failed")
+		return
+	}
+
+	result := &api.ListScenesResult{}
+	for _, scene := range scenes {
+		result.Scenes = append(result.Scenes, makeScene(&scene))
+	}
+	hutil.WriteData(c, result)
+}
+
+func makeRole(r *db.Role) api.Role {
+	return api.Role{
+		ID:         r.ID,
+		DocumentID: r.DocumentID,
+		Name:       r.Name,
+		Gender:     r.Gender,
+		Character:  r.Character,
+		Appearance: r.Appearance,
+		CreatedAt:  r.CreatedAt.Format(time.DateTime),
+		UpdatedAt:  r.UpdatedAt.Format(time.DateTime),
+	}
+}
+
+func makeScene(s *db.Scene) api.Scene {
+	return api.Scene{
+		ID:         s.ID,
+		ChapterID:  s.ChapterID,
+		DocumentID: s.DocumentID,
+		Index:      s.Index,
+		Content:    s.Content,
+		ImageURL:   s.ImageURL,
+		VoiceURL:   s.VoiceURL,
+		CreatedAt:  s.CreatedAt.Format(time.DateTime),
+		UpdatedAt:  s.UpdatedAt.Format(time.DateTime),
+	}
 }

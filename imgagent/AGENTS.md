@@ -43,7 +43,7 @@ http code: 200
 header: x-reqid
 {
     "code": <int>,  // 成功为 200，失败未非 200
-    "msg": <string>, // 失败信息，成功是为空
+    "message": <string>, // 失败信息，成功是为空
     "reqid": <string>,
     "data": <object>
 }

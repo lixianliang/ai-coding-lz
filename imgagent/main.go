@@ -14,6 +14,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"imgagent/bailian"
 	"imgagent/pkg/logger"
 	"imgagent/svr"
 )
@@ -23,8 +24,10 @@ var (
 )
 
 type Config struct {
-	LogConf  logger.Config `json:"log_conf"`
-	BindHost string        `json:"bind_host"`
+	LogConf         logger.Config      `json:"log_conf"`
+	BindHost        string             `json:"bind_host"`
+	BailianConf     bailian.Config     `json:"bailian"`
+	DocumentMgrConf svr.DocumentConfig `json:"document_mgr"`
 
 	svr.Config
 }
@@ -57,7 +60,17 @@ func main() {
 	}
 	defer wc.Close()
 
-	svr, err := svr.New(conf.Config)
+	// 创建百炼客户端
+	bailianClient, err := bailian.NewClient(conf.BailianConf)
+	if err != nil {
+		log.Fatalf("Failed to new bailian client, err: %v", err)
+	}
+
+	// 将百炼配置和文档管理配置传递给 Service
+	conf.Config.BailianConfig = conf.BailianConf
+	conf.Config.DocumentConfig = conf.DocumentMgrConf
+
+	svr, err := svr.New(conf.Config, bailianClient)
 	if err != nil {
 		log.Fatalf("Failed to new server, err: %v", err)
 	}

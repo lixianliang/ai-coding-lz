@@ -9,6 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
+	"imgagent/bailian"
 	"imgagent/db"
 	"imgagent/pkg/dbutil"
 	"imgagent/pkg/middleware"
@@ -16,11 +17,13 @@ import (
 )
 
 type Config struct {
-	APIVersion string         `json:"api_version"`
-	Temp       string         `json:"temp"`
-	Storage    storage.Config `json:"storage"`
-	DB         dbutil.Config  `json:"db"`
-	Redis      RedisConfig    `json:"redis"`
+	APIVersion     string         `json:"api_version"`
+	Temp           string         `json:"temp"`
+	Storage        storage.Config `json:"storage"`
+	DB             dbutil.Config  `json:"db"`
+	Redis          RedisConfig    `json:"redis"`
+	BailianConfig  bailian.Config `json:"-"` // 从外部传入
+	DocumentConfig DocumentConfig `json:"-"` // 从外部传入
 }
 
 type RedisConfig struct {
@@ -38,13 +41,15 @@ type EmbeddingConfig struct {
 }
 
 type Service struct {
-	conf  Config
-	db    db.IDataBase
-	redis redis.UniversalClient
-	stg   *storage.Storage
+	conf          Config
+	db            db.IDataBase
+	redis         redis.UniversalClient
+	stg           *storage.Storage
+	bailianClient *bailian.Client
+	documentMgr   *DocumentMgr
 }
 
-func New(conf Config) (*Service, error) {
+func New(conf Config, bailianClient *bailian.Client) (*Service, error) {
 	if conf.Temp == "" {
 		conf.Temp = "./temp"
 	}
@@ -78,11 +83,31 @@ func New(conf Config) (*Service, error) {
 		})
 	}
 
+	// 创建文档管理器
+	var docMgr *DocumentMgr
+	if conf.DocumentConfig.Enable {
+		confEx := DocumentConfigEx{
+			config: conf.DocumentConfig,
+			db:     db,
+		}
+		var err error
+		docMgr, err = newDocumentMgr(confEx, bailianClient)
+		if err != nil {
+			zap.S().Errorf("Failed to new document manager, err: %v", err)
+			return nil, err
+		}
+		// 启动文档管理器
+		docMgr.Run()
+		zap.S().Info("Document manager started")
+	}
+
 	return &Service{
-		conf:  conf,
-		db:    db,
-		redis: redisCli,
-		stg:   stg,
+		conf:          conf,
+		db:            db,
+		redis:         redisCli,
+		stg:           stg,
+		bailianClient: bailianClient,
+		documentMgr:   docMgr,
 	}, nil
 }
 
@@ -99,9 +124,19 @@ func (s *Service) RegisterRouter(writer io.Writer) *gin.Engine {
 	authGroup.PUT("/documents/:document_id", s.HandleUpdateDocument)
 	authGroup.DELETE("/documents/:document_id", s.HandleDeleteDocument)
 	authGroup.GET("/documents", s.HandleListDocuments)
+
+	// Chapter
 	authGroup.GET("/documents/:document_id/chapters/:id", s.HandleGetChapter)
 	authGroup.PUT("/documents/:document_id/chapters/:id", s.HandleUpdateChapter)
 	authGroup.DELETE("/documents/:document_id/chapters/:id", s.HandleDeleteChapter)
 	authGroup.GET("/documents/:document_id/chapters", s.HandleListChapters)
+
+	// Role
+	authGroup.GET("/documents/:document_id/roles", s.HandleGetRoles)
+
+	// Scene
+	authGroup.GET("/documents/:document_id/scenes", s.HandleListScenesByDocument)
+	authGroup.GET("/chapters/:chapter_id/scenes", s.HandleListScenesByChapter)
+
 	return router
 }

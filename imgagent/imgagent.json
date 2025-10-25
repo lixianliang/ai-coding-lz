@@ -1,7 +1,7 @@
 {
     "log_conf": {
         "level": "debug",
-        "file": "",
+        "file": "logs/imgagent.log",
         "access_file": "",
         "rotation": {
             "max_size": 100,
@@ -32,5 +32,20 @@
         "domain" : "bucket1.com",
         "ak" : "xxx",
         "sk" : "xx"
+    },
+    "bailian": {
+        "base_url": "https://dashscope.aliyuncs.com",
+        "api_key": "sk-1154439eadca437180d432b8c5168792",
+        "role_prompt": "",
+        "scene_prompt": "",
+        "image_size": "1328*1328",
+        "image_watermark": true,
+        "request_timeout": 300,
+        "max_retries": 0
+    },
+    "document_mgr": {
+        "enable": true,
+        "handle_scene_interval_secs": 30,
+        "handle_image_gen_interval_secs": 30
     }
 }
