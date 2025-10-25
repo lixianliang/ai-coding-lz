@@ -35,7 +35,7 @@
     },
     "bailian": {
         "base_url": "https://dashscope.aliyuncs.com",
-        "api_key": "sk-1154439eadca437180d432b8c5168792",
+        "api_key": "xxx",
         "role_prompt": "",
         "scene_prompt": "",
         "image_size": "1328*1328",
