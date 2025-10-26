@@ -34,7 +34,7 @@ type Chapter struct {
 }
 
 type UpdateChapterArgs struct {
-	Content string `json:"content" binding:"required,max=4000"`
+	Content string `json:"content" binding:"required,max=6000"`
 }
 
 type ListChaptersResult struct {

@@ -46,6 +46,16 @@
                     <el-tag size="small">{{ row.scene_ids?.length || 0 }}</el-tag>
                   </template>
                 </el-table-column>
+                <el-table-column label="操作" width="180" fixed="right">
+                  <template #default="{ row }">
+                    <el-button type="primary" size="small" :icon="Edit" @click="handleEditChapter(row)">
+                      编辑
+                    </el-button>
+                    <el-button type="danger" size="small" @click="handleDeleteChapter(row)">
+                      删除
+                    </el-button>
+                  </template>
+                </el-table-column>
               </el-table>
             </div>
           </el-tab-pane>
@@ -70,6 +80,24 @@
         </el-tabs>
       </el-main>
     </el-container>
+
+    <!-- 编辑章节对话框 -->
+    <el-dialog v-model="showEditChapterDialog" title="编辑章节" width="700px">
+      <el-form :model="chapterForm" label-width="80px" :rules="chapterRules" ref="chapterFormRef">
+        <el-form-item label="章节内容" prop="content">
+          <el-input 
+            v-model="chapterForm.content" 
+            type="textarea" 
+            :rows="12" 
+            placeholder="请输入章节内容"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditChapterDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveChapter" :loading="submittingChapter">保存</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 编辑角色对话框 -->
     <el-dialog v-model="showEditRoleDialog" title="编辑角色" width="600px">
@@ -113,9 +141,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Edit } from '@element-plus/icons-vue'
-import { ElMessage, FormInstance, FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import { useDocumentStore } from '@/stores/document'
-import { Role, UpdateRoleRequest } from '@/apis/types'
+import { Role, UpdateRoleRequest, Chapter } from '@/apis/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -123,6 +151,22 @@ const store = useDocumentStore()
 
 const loading = ref(false)
 const activeTab = ref('chapters')
+
+// 章节编辑相关
+const showEditChapterDialog = ref(false)
+const submittingChapter = ref(false)
+const chapterFormRef = ref<FormInstance>()
+const currentEditingChapterId = ref('')
+
+const chapterForm = ref({
+  content: ''
+})
+
+const chapterRules: FormRules = {
+  content: [{ required: true, message: '请输入章节内容', trigger: 'blur' }]
+}
+
+// 角色编辑相关
 const showEditRoleDialog = ref(false)
 const submitting = ref(false)
 const roleFormRef = ref<FormInstance>()
@@ -149,6 +193,65 @@ const showRoles = computed(() => {
   const status = store.currentDocument?.status
   return status === 'roleReady' || status === 'sceneReady' || status === 'imgReady'
 })
+
+// 编辑章节
+const handleEditChapter = (chapter: Chapter) => {
+  currentEditingChapterId.value = chapter.id
+  chapterForm.value = {
+    content: chapter.content
+  }
+  showEditChapterDialog.value = true
+}
+
+// 保存章节
+const handleSaveChapter = async () => {
+  if (!chapterFormRef.value) return
+  
+  await chapterFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    
+    submittingChapter.value = true
+    try {
+      const docId = store.currentDocument?.id
+      if (!docId) return
+      
+      await store.updateChapter(docId, currentEditingChapterId.value, chapterForm.value.content)
+      ElMessage.success('章节更新成功')
+      showEditChapterDialog.value = false
+    } catch (error) {
+      console.error('更新章节失败:', error)
+      ElMessage.error('章节更新失败')
+    } finally {
+      submittingChapter.value = false
+    }
+  })
+}
+
+// 删除章节
+const handleDeleteChapter = async (chapter: Chapter) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除章节 ${chapter.index} 吗？删除章节将同时删除该章节下的所有场景，此操作不可恢复。`,
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const docId = store.currentDocument?.id
+    if (!docId) return
+    
+    await store.deleteChapter(docId, chapter.id)
+    ElMessage.success('章节删除成功')
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除章节失败:', error)
+      ElMessage.error('章节删除失败')
+    }
+  }
+}
 
 // 编辑角色
 const handleEditRole = (role: Role) => {

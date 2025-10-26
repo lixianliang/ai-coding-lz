@@ -312,6 +312,11 @@ func (db *Database) UpdateSceneVoiceURL(ctx context.Context, sceneID string, voi
 	return nil
 }
 
+func (db *Database) DeleteScene(ctx context.Context, id string) error {
+	_, err := gorm.G[Scene](db.db).Where("id = ?", id).Delete(ctx)
+	return err
+}
+
 func (db *Database) DeleteScenesByChapter(ctx context.Context, chapterID string) error {
 	_, err := gorm.G[Scene](db.db).Where("chapter_id = ?", chapterID).Delete(ctx)
 	return err

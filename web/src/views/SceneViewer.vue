@@ -42,6 +42,9 @@
                 <el-button type="primary" size="small" :icon="Edit" @click="handleEditScene(scene)">
                   编辑
                 </el-button>
+                <el-button type="danger" size="small" @click="handleDeleteScene(scene)">
+                  删除
+                </el-button>
               </div>
             </div>
             
@@ -106,7 +109,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Loading, VideoPlay, VideoPause, Edit } from '@element-plus/icons-vue'
-import { ElMessage, FormInstance, FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import { useDocumentStore } from '@/stores/document'
 import { Scene, UpdateSceneRequest } from '@/apis/types'
 
@@ -262,6 +265,29 @@ const handleSaveScene = async () => {
       submitting.value = false
     }
   })
+}
+
+// 删除场景
+const handleDeleteScene = async (scene: Scene) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除场景 ${scene.index} 吗？此操作不可恢复。`,
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await store.deleteScene(scene.id)
+    ElMessage.success('场景删除成功')
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除场景失败:', error)
+      ElMessage.error('场景删除失败')
+    }
+  }
 }
 
 onMounted(async () => {

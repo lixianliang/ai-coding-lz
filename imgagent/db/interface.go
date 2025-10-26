@@ -44,6 +44,7 @@ type IDataBase interface {
 	UpdateScene(ctx context.Context, id string, args *api.UpdateSceneArgs) error
 	UpdateSceneImageURL(ctx context.Context, sceneID string, imageURL string) error
 	UpdateSceneVoiceURL(ctx context.Context, sceneID string, voiceURL string) error
+	DeleteScene(ctx context.Context, id string) error
 	DeleteScenesByChapter(ctx context.Context, chapterID string) error
 	DeleteScenesByDocument(ctx context.Context, documentID string) error
 

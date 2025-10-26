@@ -114,6 +114,28 @@ export const useDocumentStore = defineStore('document', () => {
     return res.data
   }
 
+  // 删除场景
+  async function deleteScene(sceneId: string) {
+    await api.deleteScene(sceneId)
+    // 从本地场景列表中移除
+    scenes.value = scenes.value.filter(scene => scene.id !== sceneId)
+  }
+
+  // 更新章节
+  async function updateChapter(documentId: string, chapterId: string, content: string) {
+    const res = await api.updateChapter(documentId, chapterId, { content })
+    // 更新成功后刷新章节列表
+    await fetchChapters(documentId)
+    return res.data
+  }
+
+  // 删除章节
+  async function deleteChapter(documentId: string, chapterId: string) {
+    await api.deleteChapter(documentId, chapterId)
+    // 更新成功后刷新章节列表
+    await fetchChapters(documentId)
+  }
+
   return {
     documents,
     currentDocument,
@@ -133,6 +155,9 @@ export const useDocumentStore = defineStore('document', () => {
     deleteDocument,
     pollDocumentStatus,
     updateRole,
-    updateScene
+    updateScene,
+    deleteScene,
+    updateChapter,
+    deleteChapter
   }
 })
