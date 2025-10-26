@@ -3,8 +3,14 @@
     <el-container>
       <el-header height="60px">
         <div class="header-content">
-          <h1>作品管理</h1>
-          <el-button type="primary" @click="showUploadDialog = true">
+          <div class="header-left">
+            <el-breadcrumb separator="/">
+              <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
+              <el-breadcrumb-item>作品管理</el-breadcrumb-item>
+            </el-breadcrumb>
+            <h1 class="page-title">作品管理</h1>
+          </div>
+          <el-button type="primary" class="upload-btn" @click="showUploadDialog = true">
             <el-icon><Plus /></el-icon>
             上传作品
           </el-button>
@@ -190,18 +196,76 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
+@use '../styles/variables.scss' as *;
+
 .document-list-page {
-  height: 100vh;
+  min-height: 100vh;
+  background: linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%);
   
   .header-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
     height: 100%;
+    padding: 0 16px;
     
-    h1 {
-      margin: 0;
+    .header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      
+      .page-title {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 600;
+        color: #333;
+        animation: slideDown 0.5s ease-out;
+      }
     }
+    
+    .upload-btn {
+      animation: pulse 2s ease-in-out infinite;
+      
+      &:hover {
+        animation: none;
+        transform: scale(1.05);
+      }
+    }
+  }
+  
+  :deep(.el-table) {
+    border-radius: $border-radius-md;
+    overflow: hidden;
+    box-shadow: $shadow-sm;
+    
+    .el-table__row {
+      transition: all $transition-fast;
+      
+      &:hover {
+        background-color: rgba(255, 107, 157, 0.05) !important;
+        transform: scale(1.01);
+      }
+    }
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
   }
 }
 </style>
