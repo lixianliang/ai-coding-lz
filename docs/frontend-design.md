@@ -46,6 +46,8 @@ web/src/
 - 文档基本信息
 - 进度条展示（当前处理阶段）
 - 角色列表（卡片）
+  - 支持编辑角色信息
+  - 编辑对话框（名字、性别、性格、外貌）
 - 章节列表（可展开查看场景）
 - 自动轮询状态（5秒间隔）
 
@@ -53,6 +55,10 @@ web/src/
 - 场景图片瀑布流
 - 图片点击放大预览
 - 场景描述文字
+- 支持编辑场景内容
+  - 编辑后自动重新生成图片和语音
+  - 显示生成进度提示
+- 语音播放功能
 
 ## 三、核心组件
 
@@ -83,6 +89,10 @@ web/src/
 **显示:**
 - 名字、性别、性格、外貌
 
+**功能:**
+- 编辑按钮，打开编辑对话框
+- 表单验证（所有字段必填）
+
 ### 3.4 SceneCard.vue
 场景卡片
 
@@ -92,6 +102,9 @@ web/src/
 **功能:**
 - 图片展示（懒加载）
 - 点击放大预览
+- 编辑按钮，打开编辑对话框
+- 语音播放按钮
+- 场景内容编辑后重新生成提示
 
 ## 四、状态管理 (Pinia)
 
@@ -111,6 +124,8 @@ export const useDocumentStore = defineStore('document', () => {
   const fetchDocumentDetail = async (id: string) => { }
   const uploadDocument = async (name: string, file: File) => { }
   const deleteDocument = async (id: string) => { }
+  const updateRole = async (roleId: string, data: UpdateRoleRequest) => { }
+  const updateScene = async (sceneId: string, data: UpdateSceneRequest) => { }
   
   // 轮询
   const startPolling = (docId: string) => {
@@ -119,7 +134,7 @@ export const useDocumentStore = defineStore('document', () => {
   }
   const stopPolling = () => { }
   
-  return { documents, fetchDocuments, ... }
+  return { documents, fetchDocuments, updateRole, updateScene, ... }
 })
 ```
 
@@ -166,6 +181,17 @@ export interface Role {
   gender: string
   character: string
   appearance: string
+}
+
+export interface UpdateRoleRequest {
+  name: string
+  gender: string
+  character: string
+  appearance: string
+}
+
+export interface UpdateSceneRequest {
+  content: string
 }
 ```
 
@@ -238,6 +264,14 @@ export const documentApi = {
   listScenes(documentId: string): Promise<Scene[]> {
     return request.get(`/documents/${documentId}/scenes`)
       .then(res => res.scenes)
+  },
+  
+  updateRole(roleId: string, data: UpdateRoleRequest): Promise<Role> {
+    return request.put(`/roles/${roleId}`, data)
+  },
+  
+  updateScene(sceneId: string, data: UpdateSceneRequest): Promise<Scene> {
+    return request.put(`/scenes/${sceneId}`, data)
   }
 }
 ```
