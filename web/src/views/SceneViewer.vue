@@ -74,6 +74,9 @@ const loading = ref(false)
 const playingSceneId = ref<string | null>(null)
 const audioRefs = ref<Map<string, HTMLAudioElement>>(new Map())
 
+// 轮询定时器
+let pollInterval: NodeJS.Timeout | null = null
+
 // 播放/暂停音频
 const toggleAudio = async (sceneId: string, voiceUrl: string) => {
   if (playingSceneId.value === sceneId) {
@@ -125,7 +128,40 @@ const toggleAudio = async (sceneId: string, voiceUrl: string) => {
   }
 }
 
-// 组件卸载时清理音频资源
+// 开始轮询场景状态
+const startPolling = () => {
+  const id = route.params.id as string
+  
+  // 清除旧定时器
+  if (pollInterval) {
+    clearInterval(pollInterval)
+  }
+  
+  // 每5秒轮询一次
+  pollInterval = setInterval(async () => {
+    await Promise.all([
+      store.fetchDocument(id),
+      store.fetchDocumentScenes(id)
+    ])
+    
+    // 如果所有场景的图片都已生成，停止轮询
+    const allImagesReady = store.scenes.every(scene => scene.image_url)
+    if (allImagesReady && pollInterval) {
+      clearInterval(pollInterval)
+      pollInterval = null
+    }
+  }, 5000)
+}
+
+// 停止轮询
+const stopPolling = () => {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+}
+
+// 组件加载时
 onMounted(async () => {
   const id = route.params.id as string
   loading.value = true
@@ -134,12 +170,22 @@ onMounted(async () => {
       store.fetchDocument(id),
       store.fetchDocumentScenes(id)
     ])
+    
+    // 如果还有未生成图片的场景，开始轮询
+    const hasUnfinished = store.scenes.some(scene => !scene.image_url)
+    if (hasUnfinished) {
+      startPolling()
+    }
   } finally {
     loading.value = false
   }
 })
 
+// 组件卸载时清理资源
 onUnmounted(() => {
+  // 停止轮询
+  stopPolling()
+  
   // 停止所有音频并清理
   audioRefs.value.forEach((audio) => {
     audio.pause()

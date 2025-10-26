@@ -3,17 +3,17 @@
     <el-container>
       <el-header height="60px">
         <div class="header-content">
-          <h1>文档管理</h1>
+          <h1>作品管理</h1>
           <el-button type="primary" @click="showUploadDialog = true">
             <el-icon><Plus /></el-icon>
-            上传文档
+            上传作品
           </el-button>
         </div>
       </el-header>
       
       <el-main>
         <el-table :data="store.documents" v-loading="loading" stripe>
-          <el-table-column prop="name" label="文档名称" width="300" />
+          <el-table-column prop="name" label="作品名称" width="300" />
           <el-table-column prop="status" label="状态" width="180">
             <template #default="{ row }">
               <el-tag v-if="row.status === 'chapterReady'" type="info">章节就绪</el-tag>
@@ -42,10 +42,10 @@
     </el-container>
 
     <!-- 上传对话框 -->
-    <el-dialog v-model="showUploadDialog" title="上传文档" width="500px">
+    <el-dialog v-model="showUploadDialog" title="上传作品" width="500px">
       <el-form :model="uploadForm" label-width="80px">
-        <el-form-item label="文档名称">
-          <el-input v-model="uploadForm.name" placeholder="请输入文档名称" />
+        <el-form-item label="作品名称">
+          <el-input v-model="uploadForm.name" placeholder="请输入作品名称" />
         </el-form-item>
         <el-form-item label="选择文件">
           <el-upload
@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
@@ -87,13 +87,26 @@ const uploadForm = ref({
 const uploading = ref(false)
 const uploadRef = ref()
 
+// 轮询定时器
+let pollInterval: NodeJS.Timeout | null = null
+
 const handleFileChange = (file: any) => {
   uploadForm.value.file = file.raw
+  
+  // 自动填充作品名称（去掉文件后缀）
+  if (file.name) {
+    const fileName = file.name
+    const lastDotIndex = fileName.lastIndexOf('.')
+    const nameWithoutExt = lastDotIndex > 0 
+      ? fileName.substring(0, lastDotIndex) 
+      : fileName
+    uploadForm.value.name = nameWithoutExt
+  }
 }
 
 const handleUpload = async () => {
   if (!uploadForm.value.name) {
-    ElMessage.warning('请输入文档名称')
+    ElMessage.warning('请输入作品名称')
     return
   }
   if (!uploadForm.value.file) {
@@ -109,7 +122,7 @@ const handleUpload = async () => {
     uploadForm.value = { name: '', file: null }
     uploadRef.value?.clearFiles()
     
-    // 开始轮询文档状态
+    // 开始轮询作品状态
     store.pollDocumentStatus(doc.id)
   } catch (error) {
     ElMessage.error('上传失败')
@@ -128,7 +141,7 @@ const handleViewScenes = (doc: any) => {
 
 const handleDelete = async (doc: any) => {
   try {
-    await ElMessageBox.confirm('确定要删除这个文档吗？', '提示', {
+    await ElMessageBox.confirm('确定要删除这个作品吗？', '提示', {
       type: 'warning'
     })
     await store.deleteDocument(doc.id)
@@ -138,13 +151,41 @@ const handleDelete = async (doc: any) => {
   }
 }
 
+// 开始轮询作品状态
+const startPolling = () => {
+  // 清除旧定时器
+  if (pollInterval) {
+    clearInterval(pollInterval)
+  }
+  
+  // 每5秒轮询一次
+  pollInterval = setInterval(async () => {
+    await store.fetchDocuments()
+  }, 5000)
+}
+
+// 停止轮询
+const stopPolling = () => {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+}
+
 onMounted(async () => {
   loading.value = true
   try {
     await store.fetchDocuments()
+    // 开始轮询
+    startPolling()
   } finally {
     loading.value = false
   }
+})
+
+onUnmounted(() => {
+  // 组件卸载时停止轮询
+  stopPolling()
 })
 </script>
 

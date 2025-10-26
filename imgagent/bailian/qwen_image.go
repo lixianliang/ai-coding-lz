@@ -123,7 +123,7 @@ func buildImagePrompt(sceneContent string, summary string, roles []RoleInfo) str
 				prompt += fmt.Sprintf("- %s：性别：%s； 性格特点：%s；外貌特征：%s\n", role.Name, role.Gender, role.Character, role.Appearance)
 			}
 		}
-		prompt += "角色信息使用规则：\n场景描述中提到的人物需参考对应的角色信息\n"
+		prompt += "角色信息使用规则：场景描述中提到的人物需参考对应的角色信息。\n\n"
 	}
 
 	prompt += fmt.Sprintf("根据以下场景描述生成一张动漫图片：%s\n", sceneContent)
