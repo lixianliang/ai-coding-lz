@@ -103,7 +103,11 @@ Content-Type: multipart/form-data
 
 **说明**
 
-- 文档初始状态为 `chapterReady`（章节准备就绪），完成场景提取后状态变为 `sceneReady`（场景准备就绪），完成图片生成后状态变为 `imgReady`（图片准备就绪）
+- 文档状态流转：`chapterReady`（章节准备就绪） → `roleReady`（角色准备就绪） → `sceneReady`（场景准备就绪） → `imgReady`（图片准备就绪）
+- 初始状态：文档上传后为 `chapterReady`
+- Worker 1 完成角色提取后，状态变为 `roleReady`
+- Worker 2 完成场景生成后，状态变为 `sceneReady`
+- Worker 3 完成图片生成后，状态变为 `imgReady`
 
 ---
 
@@ -672,7 +676,7 @@ GET /v1/chapters/:chapter_id/scenes
 |------|------|------|
 | id | string | 文档唯一标识，32位UUID |
 | name | string | 文档名称，最大50字符 |
-| status | string | 文档状态：`chapterReady` (章节就绪)、`sceneReady` (场景就绪)、`imgReady` (图片就绪) |
+| status | string | 文档状态：`chapterReady` (章节就绪)、`roleReady` (角色就绪)、`sceneReady` (场景就绪)、`imgReady` (图片就绪) |
 | created_at | string | 创建时间，格式：YYYY-MM-DD HH:MM:SS |
 | updated_at | string | 更新时间，格式：YYYY-MM-DD HH:MM:SS |
 
