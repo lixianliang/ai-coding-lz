@@ -363,9 +363,9 @@ func (m *DocumentMgr) HandleDocumentImageGen(ctx context.Context, doc db.Documen
 
 	log.Infof("Found %d pending image scenes for doc: %s", len(scenes), doc.ID)
 
-	// 3. 为每个场景生成图片（包含摘要和角色信息）
+	// 3. 为每个场景生成图片和语音（包含摘要和角色信息）
 	for _, scene := range scenes {
-		log.Infof("Generating image for scene, sceneID: %s, content: %s", scene.ID, scene.Content)
+		log.Infof("Generating image and voice for scene, sceneID: %s, content: %s", scene.ID, scene.Content)
 
 		imageURL, err := m.bailianClient.GenerateImage(ctx, scene.Content, doc.Summary, roles)
 		if err != nil {
@@ -381,6 +381,22 @@ func (m *DocumentMgr) HandleDocumentImageGen(ctx context.Context, doc db.Documen
 		}
 
 		log.Infof("Image generated for scene: %s, URL: %s", scene.ID, imageURL)
+
+		// 生成语音
+		voiceURL, err := m.bailianClient.GenerateTTS(ctx, scene.Content)
+		if err != nil {
+			log.Errorf("Failed to generate TTS, scene: %s, err: %v", scene.ID, err)
+			return err
+		}
+
+		// 更新场景语音 URL
+		err = m.db.UpdateSceneVoiceURL(ctx, scene.ID, voiceURL)
+		if err != nil {
+			log.Errorf("Failed to update scene voiceURL, scene: %s, err: %v", scene.ID, err)
+			return err
+		}
+
+		log.Infof("Voice generated for scene: %s, URL: %s", scene.ID, voiceURL)
 	}
 
 	log.Infof("All images generated for doc: %s", doc.ID)

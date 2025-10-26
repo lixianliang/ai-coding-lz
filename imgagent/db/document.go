@@ -286,6 +286,20 @@ func (db *Database) UpdateSceneImageURL(ctx context.Context, sceneID string, ima
 	return nil
 }
 
+func (db *Database) UpdateSceneVoiceURL(ctx context.Context, sceneID string, voiceURL string) error {
+	result := db.db.WithContext(ctx).Model(&Scene{}).Where("id = ?", sceneID).Updates(map[string]interface{}{
+		"voice_url":  voiceURL,
+		"updated_at": time.Now(),
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (db *Database) DeleteScenesByChapter(ctx context.Context, chapterID string) error {
 	_, err := gorm.G[Scene](db.db).Where("chapter_id = ?", chapterID).Delete(ctx)
 	return err
