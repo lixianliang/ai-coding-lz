@@ -33,7 +33,13 @@
           <div v-else class="works-grid slide-up">
             <div v-for="work in store.documents" :key="work.id" class="work-card">
               <div class="work-cover" @click="handleView(work)">
-                <el-icon class="cover-icon"><Document /></el-icon>
+                <img 
+                  v-if="work.summary_image_url" 
+                  :src="work.summary_image_url" 
+                  class="cover-image"
+                  alt="封面"
+                />
+                <el-icon v-else class="cover-icon"><Document /></el-icon>
                 <div class="status-badge">
                   <el-tag :type="getStatusType(work.status)" size="small">
                     {{ getStatusText(work.status) }}
@@ -431,6 +437,13 @@ onUnmounted(() => {
               transition: all $transition-normal;
             }
             
+            .cover-image {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+              transition: transform $transition-normal;
+            }
+            
             .status-badge {
               position: absolute;
               top: 12px;
@@ -440,6 +453,10 @@ onUnmounted(() => {
             &:hover .cover-icon {
               transform: scale(1.1);
               opacity: 1;
+            }
+            
+            &:hover .cover-image {
+              transform: scale(1.1);
             }
           }
           

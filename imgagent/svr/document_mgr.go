@@ -150,6 +150,24 @@ func (m *DocumentMgr) HandleDocumentRole(ctx context.Context, doc db.Document) e
 
 		doc.Summary = summary
 		log.Infof("Summary extracted and saved for doc: %s, length: %d", doc.ID, len(summary))
+
+		// 生成封面图片
+		if summary != "" {
+			log.Infof("Generating cover image for doc: %s", doc.ID)
+			coverImageURL, err := m.bailianClient.GenerateCoverImage(ctx, summary)
+			if err != nil {
+				log.Errorf("Failed to generate cover image, doc: %s, err: %v", doc.ID, err)
+				// 封面生成失败不影响后续流程，记录日志后继续
+			} else {
+				err = m.db.UpdateDocumentSummaryImageURL(ctx, doc.ID, coverImageURL)
+				if err != nil {
+					log.Errorf("Failed to update document summary image URL, doc: %s, err: %v", doc.ID, err)
+					// 更新失败不影响后续流程
+				} else {
+					log.Infof("Cover image generated and saved for doc: %s, URL: %s", doc.ID, coverImageURL)
+				}
+			}
+		}
 	} else {
 		log.Infof("Summary already exists for doc: %s", doc.ID)
 	}

@@ -348,11 +348,13 @@ func (s *Service) HandleListChapters(c *gin.Context) {
 
 func makeDocument(d *db.Document) api.Document {
 	return api.Document{
-		ID:        d.ID,
-		Name:      d.Name,
-		Status:    d.Status,
-		CreatedAt: d.CreatedAt.Format(time.DateTime),
-		UpdatedAt: d.UpdatedAt.Format(time.DateTime),
+		ID:               d.ID,
+		Name:             d.Name,
+		FileID:           d.FileID,
+		SummaryImageURL:  d.SummaryImageURL,
+		Status:           d.Status,
+		CreatedAt:        d.CreatedAt.Format(time.DateTime),
+		UpdatedAt:        d.UpdatedAt.Format(time.DateTime),
 	}
 }
 
