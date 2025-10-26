@@ -81,6 +81,10 @@ func New(conf Config, bailianClient *bailian.Client) (*Service, error) {
 		redisCli = redis.NewClient(&redis.Options{
 			Addr: conf.Redis.Addrs[0],
 		})
+	} else {
+		redisCli = redis.NewClusterClient(&redis.ClusterOptions{
+			Addrs: conf.Redis.Addrs,
+		})
 	}
 
 	// 创建文档管理器
