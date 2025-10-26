@@ -1,5 +1,5 @@
 <template>
-  <div class="scene-viewer-page">
+  <div class="chapter-scene-viewer-page">
     <el-container>
       <el-header height="60px">
         <div class="header-content">
@@ -7,7 +7,7 @@
             <el-icon><ArrowLeft /></el-icon>
             返回
           </el-button>
-          <h2>{{ store.currentDocument?.name }} - 场景</h2>
+          <h2>{{ store.currentChapter?.title || `章节 ${store.currentChapter?.index}` }} - 场景</h2>
         </div>
       </el-header>
       
@@ -44,7 +44,19 @@
               </div>
               
               <div class="scene-image" v-if="scene.image_url">
-                <img :src="scene.image_url" alt="场景图片" />
+                <el-image 
+                  :src="scene.image_url" 
+                  :preview-src-list="[scene.image_url]"
+                  fit="cover"
+                  class="image-preview"
+                >
+                  <template #error>
+                    <div class="image-error">
+                      <el-icon><Picture /></el-icon>
+                      <span>加载失败</span>
+                    </div>
+                  </template>
+                </el-image>
               </div>
               
               <div class="scene-loading" v-else>
@@ -62,7 +74,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Loading, VideoPlay, VideoPause } from '@element-plus/icons-vue'
+import { ArrowLeft, Loading, VideoPlay, VideoPause, Picture } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useDocumentStore } from '@/stores/document'
 
@@ -124,17 +136,14 @@ const toggleAudio = async (sceneId: string, voiceUrl: string) => {
 
 // 开始轮询场景状态
 const startPolling = () => {
-  const id = route.params.id as string
+  const chapterId = route.params.chapterId as string
   
   if (pollInterval) {
     clearInterval(pollInterval)
   }
   
   pollInterval = setInterval(async () => {
-    await Promise.all([
-      store.fetchDocument(id),
-      store.fetchDocumentScenes(id)
-    ])
+    await store.fetchChapterScenes(chapterId)
     
     const allImagesReady = store.scenes.every(scene => scene.image_url)
     if (allImagesReady && pollInterval) {
@@ -153,12 +162,12 @@ const stopPolling = () => {
 }
 
 onMounted(async () => {
-  const id = route.params.id as string
+  const chapterId = route.params.chapterId as string
   loading.value = true
   try {
     await Promise.all([
-      store.fetchDocument(id),
-      store.fetchDocumentScenes(id)
+      store.fetchChapter(chapterId),
+      store.fetchChapterScenes(chapterId)
     ])
     
     const hasUnfinished = store.scenes.some(scene => !scene.image_url)
@@ -183,7 +192,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
-.scene-viewer-page {
+.chapter-scene-viewer-page {
   height: 100vh;
   
   .header-content {
@@ -230,9 +239,10 @@ onUnmounted(() => {
         margin: 0;
         line-height: 1.6;
         color: #666;
+        font-size: 15px;
       }
     }
-
+    
     .scene-audio {
       margin-bottom: 16px;
       
@@ -244,26 +254,47 @@ onUnmounted(() => {
     }
     
     .scene-image {
-      img {
+      margin-top: 16px;
+      
+      .image-preview {
         width: 100%;
-        max-width: 800px;
         border-radius: 8px;
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        transition: transform 0.3s;
+        
+        &:hover {
+          transform: scale(1.02);
+        }
+      }
+      
+      .image-error {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px;
+        color: #999;
+        
+        .el-icon {
+          font-size: 48px;
+          margin-bottom: 8px;
+        }
       }
     }
     
     .scene-loading {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 40px;
-      text-align: center;
+      justify-content: center;
+      padding: 60px;
       color: #999;
       
       .el-icon {
-        font-size: 24px;
+        font-size: 32px;
+        margin-right: 12px;
       }
     }
   }
 }
 </style>
+

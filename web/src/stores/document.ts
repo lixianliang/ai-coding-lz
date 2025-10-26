@@ -6,6 +6,7 @@ import * as api from '@/apis/modules/document'
 export const useDocumentStore = defineStore('document', () => {
   const documents = ref<Document[]>([])
   const currentDocument = ref<Document | null>(null)
+  const currentChapter = ref<Chapter | null>(null)
   const chapters = ref<Chapter[]>([])
   const roles = ref<Role[]>([])
   const scenes = ref<Scene[]>([])
@@ -42,6 +43,18 @@ export const useDocumentStore = defineStore('document', () => {
   // 获取文档场景列表
   async function fetchDocumentScenes(documentId: string) {
     const res = await api.getDocumentScenes(documentId)
+    scenes.value = res.data.scenes || []
+  }
+
+  // 获取章节详情
+  async function fetchChapter(chapterId: string) {
+    const res = await api.getChapter(chapterId)
+    currentChapter.value = res.data
+  }
+
+  // 获取章节场景列表
+  async function fetchChapterScenes(chapterId: string) {
+    const res = await api.getChapterScenes(chapterId)
     scenes.value = res.data.scenes || []
   }
 
@@ -84,15 +97,18 @@ export const useDocumentStore = defineStore('document', () => {
   return {
     documents,
     currentDocument,
+    currentChapter,
     chapters,
     roles,
     scenes,
     isLoading,
     fetchDocuments,
     fetchDocument,
+    fetchChapter,
     fetchChapters,
     fetchRoles,
     fetchDocumentScenes,
+    fetchChapterScenes,
     createDocument,
     deleteDocument,
     pollDocumentStatus
