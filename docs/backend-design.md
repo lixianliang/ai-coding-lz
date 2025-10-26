@@ -1096,11 +1096,6 @@ authGroup.GET("/chapters/:chapter_id/scenes", s.HandleListScenesByChapter)
         "database": "imgagent",
         "enable_log": true
     },
-    "redis": {
-        "disable_cluster": true,
-        "expire_secs": 60,
-        "addrs": ["localhost:6379"]
-    },
     "storage": {
         "bucket": "bucket1",
         "domain": "bucket1.com",
@@ -1169,7 +1164,6 @@ type Config struct {
     Temp           string                `json:"temp"`
     Storage        storage.Config        `json:"storage"`
     DB             dbutil.Config         `json:"db"`
-    Redis          RedisConfig           `json:"redis"`
     BailianConfig  bailian.Config        `json:"-"`  // 从外部传入
     DocumentConfig DocumentConfig        `json:"-"`  // 从外部传入
 }
@@ -1177,7 +1171,6 @@ type Config struct {
 type Service struct {
     conf          Config
     db            db.IDataBase
-    redis         redis.UniversalClient
     stg           *storage.Storage
     bailianClient *bailian.Client
     documentMgr   *DocumentMgr
