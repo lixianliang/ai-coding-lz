@@ -310,7 +310,17 @@ func (s *Service) HandleDeleteChapter(c *gin.Context) {
 	}
 
 	log.Infof("Delete Chapter, docID: %s, id: %s", docID, id)
-	err := s.db.DeleteChapter(ctx, id, docID)
+
+	// 先删除章节关联的所有场景
+	err := s.db.DeleteScenesByChapter(ctx, id)
+	if err != nil {
+		log.Errorf("Failed to delete scenes by chapter, err: %v", err)
+		hutil.AbortError(c, http.StatusInternalServerError, "delete scenes failed")
+		return
+	}
+
+	// 再删除章节
+	err = s.db.DeleteChapter(ctx, id, docID)
 	if err != nil {
 		log.Errorf("Failed to delete db Chapter, err: %v", err)
 		hutil.AbortError(c, http.StatusInternalServerError, "delete Chapter failed")
@@ -348,13 +358,13 @@ func (s *Service) HandleListChapters(c *gin.Context) {
 
 func makeDocument(d *db.Document) api.Document {
 	return api.Document{
-		ID:               d.ID,
-		Name:             d.Name,
-		FileID:           d.FileID,
-		SummaryImageURL:  d.SummaryImageURL,
-		Status:           d.Status,
-		CreatedAt:        d.CreatedAt.Format(time.DateTime),
-		UpdatedAt:        d.UpdatedAt.Format(time.DateTime),
+		ID:              d.ID,
+		Name:            d.Name,
+		FileID:          d.FileID,
+		SummaryImageURL: d.SummaryImageURL,
+		Status:          d.Status,
+		CreatedAt:       d.CreatedAt.Format(time.DateTime),
+		UpdatedAt:       d.UpdatedAt.Format(time.DateTime),
 	}
 }
 
@@ -692,4 +702,31 @@ func (s *Service) HandleUpdateScene(c *gin.Context) {
 
 	log.Infof("Scene updated and regenerated, sceneID: %s", sceneID)
 	hutil.WriteData(c, makeScene(&scene))
+}
+
+// HandleDeleteScene 删除场景
+func (s *Service) HandleDeleteScene(c *gin.Context) {
+	ctx := c.Request.Context()
+	log := logger.FromGinContext(c)
+
+	sceneID := c.Param("id")
+	if sceneID == "" {
+		hutil.AbortError(c, http.StatusBadRequest, "invalid scene id")
+		return
+	}
+
+	log.Infof("Delete scene, sceneID: %s", sceneID)
+	err := s.db.DeleteScene(ctx, sceneID)
+	if err != nil {
+		log.Errorf("Failed to delete scene, err: %v", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			hutil.AbortError(c, http.StatusNotFound, "scene not found")
+		} else {
+			hutil.AbortError(c, http.StatusInternalServerError, "delete scene failed")
+		}
+		return
+	}
+
+	log.Infof("Scene deleted successfully, sceneID: %s", sceneID)
+	hutil.WriteData(c, nil)
 }

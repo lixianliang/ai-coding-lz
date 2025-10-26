@@ -57,13 +57,13 @@ export function getChapter(id: string) {
 }
 
 // 更新章节
-export function updateChapter(id: string, data: Partial<Chapter>) {
-  return request.put(`/chapters/${id}`, data) as Promise<BaseResponse<Chapter>>
+export function updateChapter(documentId: string, chapterId: string, data: { content: string }) {
+  return request.put(`/documents/${documentId}/chapters/${chapterId}`, data) as Promise<BaseResponse<Chapter>>
 }
 
 // 删除章节
-export function deleteChapter(id: string) {
-  return request.delete(`/chapters/${id}`) as Promise<BaseResponse<void>>
+export function deleteChapter(documentId: string, chapterId: string) {
+  return request.delete(`/documents/${documentId}/chapters/${chapterId}`) as Promise<BaseResponse<void>>
 }
 
 // 角色列表
@@ -89,4 +89,9 @@ export function updateRole(roleId: string, data: UpdateRoleRequest) {
 // 更新场景
 export function updateScene(sceneId: string, data: UpdateSceneRequest) {
   return request.put(`/scenes/${sceneId}`, data) as Promise<BaseResponse<Scene>>
+}
+
+// 删除场景
+export function deleteScene(sceneId: string) {
+  return request.delete(`/scenes/${sceneId}`) as Promise<BaseResponse<void>>
 }

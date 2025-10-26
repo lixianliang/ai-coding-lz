@@ -1,7 +1,7 @@
 {
     "log_conf": {
         "level": "debug",
-        "file": "logs/imgagent.log",
+        "file": "",
         "access_file": "",
         "rotation": {
             "max_size": 100,

@@ -113,6 +113,7 @@ func (s *Service) RegisterRouter(writer io.Writer) *gin.Engine {
 	authGroup.GET("/documents/:document_id/scenes", s.HandleListScenesByDocument)
 	authGroup.GET("/chapters/:chapter_id/scenes", s.HandleListScenesByChapter)
 	authGroup.PUT("/scenes/:id", s.HandleUpdateScene)
+	authGroup.DELETE("/scenes/:id", s.HandleDeleteScene)
 
 	return router
 }
