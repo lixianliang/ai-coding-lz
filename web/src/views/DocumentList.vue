@@ -49,7 +49,7 @@
                   </div>
                 </div>
                 <div class="work-actions">
-                  <el-button type="primary" size="small" @click="handleView(work)">查看</el-button>
+                  <el-button type="primary" size="small" @click="handleView(work)">章节</el-button>
                   <el-button type="success" size="small" @click="handleViewScenes(work)">场景</el-button>
                   <el-button type="danger" size="small" @click="handleDelete(work)">删除</el-button>
                 </div>
@@ -120,7 +120,7 @@ const getStatusText = (status: string) => {
     chapterReady: '章节就绪',
     roleReady: '角色提取完成',
     sceneReady: '场景生成完成',
-    imgReady: '图片生成完成'
+    imgReady: '漫画生成完成'
   }
   return statusMap[status] || status
 }
