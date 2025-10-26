@@ -190,7 +190,9 @@ ListPendingImageScenes(ctx, documentID) ([]Scene, error)  // 查询未生成图�
 UpdateScene(ctx, id, args *api.UpdateSceneArgs) error  // 更新场景内容
 UpdateSceneImageURL(ctx, sceneID, imageURL) error
 UpdateSceneVoiceURL(ctx, sceneID, voiceURL) error  // 更新语音URL
+DeleteScene(ctx, id) error  // 删除单个场景
 DeleteScenesByChapter(ctx, chapterID) error
+DeleteScenesByDocument(ctx, documentID) error  // 删除文档下所有场景
 ```
 
 #### Role DAO（新增）
@@ -1085,6 +1087,46 @@ GET /v1/chapters/{chapter_id}/scenes
 - 400: 参数无效
 - 612: 章节不存在
 
+---
+
+#### DELETE /v1/scenes/:id
+
+删除指定的场景。
+
+**请求：**
+```
+DELETE /v1/scenes/{id}
+```
+
+**路径参数：**
+- `id`: 场景ID
+
+**响应：**
+```json
+{
+    "code": 200,
+    "message": "",
+    "reqid": "abc123-def456-ghi789",
+    "data": null
+}
+```
+
+**错误码：**
+- 400: 场景ID无效
+- 404: 场景不存在
+- 500: 删除失败
+
+**实现逻辑：**
+```go
+func (s *Service) HandleDeleteScene(c *gin.Context) {
+    // 1. 获取场景ID
+    // 2. 调用 DAO 删除场景
+    // 3. 返回成功响应
+}
+```
+
+---
+
 ### 4.3 API 类型定义
 
 在 `imgagent/api/scene.go` 中添加：
@@ -1152,6 +1194,7 @@ authGroup.PUT("/roles/:id", s.HandleUpdateRole)
 authGroup.GET("/documents/:document_id/scenes", s.HandleListScenesByDocument)
 authGroup.GET("/chapters/:chapter_id/scenes", s.HandleListScenesByChapter)
 authGroup.PUT("/scenes/:id", s.HandleUpdateScene)
+authGroup.DELETE("/scenes/:id", s.HandleDeleteScene)
 ```
 
 ## 五、配置文件设计
