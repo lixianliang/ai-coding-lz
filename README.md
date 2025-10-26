@@ -21,4 +21,4 @@
 4.启动前端服务（需安装npm)
   cd web && npm run dev  
 
-5.浏览器里访问 "<http://localhost:3000>"  就可以了
+5.浏览器里访问 "<http://localhost:3000>"  就可以
