@@ -302,14 +302,14 @@ func (m *DocumentMgr) HandleDocumentScence(ctx context.Context, doc db.Document)
 func (m *DocumentMgr) HandleImageGenTasks(ctx context.Context) {
 	log := logger.FromContext(ctx)
 
-	// 1. 查询 sceneReady 状态的文档
+	// 查询 sceneReady 状态的文档
 	docs, err := m.db.ListSceneReadyDocuments(ctx)
 	if err != nil {
 		log.Errorf("Failed to list sceneReady documents, err: %v", err)
 		return
 	}
 
-	// 2. 逐个处理文档
+	// 逐个处理文档
 	for _, doc := range docs {
 		err = m.HandleDocumentImageGen(ctx, doc)
 		if err != nil {
@@ -317,7 +317,7 @@ func (m *DocumentMgr) HandleImageGenTasks(ctx context.Context) {
 			continue // 失败保持状态，下次继续处理
 		}
 
-		// 3. 更新文档状态为 imgReady
+		// 更新文档状态为 imgReady
 		err = m.db.UpdateDocumentStatus(ctx, doc.ID, db.DocumentStatusImgReady)
 		if err != nil {
 			log.Errorf("Failed to update document status, doc: %s, err: %v", doc.ID, err)

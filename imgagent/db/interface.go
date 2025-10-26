@@ -40,6 +40,7 @@ type IDataBase interface {
 	ListScenesByChapter(ctx context.Context, chapterID string) ([]Scene, error)
 	ListScenesByDocument(ctx context.Context, documentID string) ([]Scene, error)
 	ListPendingImageScenes(ctx context.Context, documentID string) ([]Scene, error)
+	UpdateScene(ctx context.Context, id string, args *api.UpdateSceneArgs) error
 	UpdateSceneImageURL(ctx context.Context, sceneID string, imageURL string) error
 	UpdateSceneVoiceURL(ctx context.Context, sceneID string, voiceURL string) error
 	DeleteScenesByChapter(ctx context.Context, chapterID string) error
@@ -49,5 +50,6 @@ type IDataBase interface {
 	CreateRoles(ctx context.Context, roles []Role) error
 	GetRole(ctx context.Context, id string) (Role, error)
 	ListRolesByDocument(ctx context.Context, documentID string) ([]Role, error)
+	UpdateRole(ctx context.Context, id string, args *api.UpdateRoleArgs) error
 	DeleteRolesByDocument(ctx context.Context, documentID string) error
 }

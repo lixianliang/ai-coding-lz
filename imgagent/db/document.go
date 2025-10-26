@@ -265,7 +265,7 @@ func (db *Database) ListScenesByChapter(ctx context.Context, chapterID string) (
 }
 
 func (db *Database) ListScenesByDocument(ctx context.Context, documentID string) ([]Scene, error) {
-	return gorm.G[Scene](db.db).Where("document_id = ?", documentID).Order("`index` ASC").Find(ctx)
+	return gorm.G[Scene](db.db).Where("document_id = ?", documentID).Order("chapter_id ASC, `index` ASC").Find(ctx)
 }
 
 func (db *Database) ListPendingImageScenes(ctx context.Context, documentID string) ([]Scene, error) {
@@ -330,4 +330,38 @@ func (db *Database) ListRolesByDocument(ctx context.Context, documentID string) 
 func (db *Database) DeleteRolesByDocument(ctx context.Context, documentID string) error {
 	_, err := gorm.G[Role](db.db).Where("document_id = ?", documentID).Delete(ctx)
 	return err
+}
+
+func (db *Database) UpdateRole(ctx context.Context, id string, args *api.UpdateRoleArgs) error {
+	now := time.Now()
+	role := Role{
+		Name:       args.Name,
+		Gender:     args.Gender,
+		Character:  args.Character,
+		Appearance: args.Appearance,
+		UpdatedAt:  now,
+	}
+	rowsAffected, err := gorm.G[Role](db.db).Where("id = ?", id).Updates(ctx, role)
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (db *Database) UpdateScene(ctx context.Context, id string, args *api.UpdateSceneArgs) error {
+	// 仅更新场景内容
+	result := db.db.WithContext(ctx).Model(&Scene{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"content":    args.Content,
+		"updated_at": time.Now(),
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
