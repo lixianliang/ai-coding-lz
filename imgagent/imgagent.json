@@ -34,7 +34,7 @@
         "role_prompt": "",
         "scene_prompt": "",
         "image_size": "1328*1328",
-        "image_watermark": true,
+        "image_watermark": false,
         "request_timeout": 300,
         "max_retries": 0
     },
