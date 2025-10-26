@@ -90,7 +90,7 @@ func (s *Service) HandleCreateDocument(c *gin.Context) {
 	// 分割章节
 	chunkOverlap := 100
 	texts, err := spliter.Split(ctx, tempFilename, spliter.Option{
-		ChunkSize:    2000,
+		ChunkSize:    5000,
 		ChunkOverlap: chunkOverlap,
 		Separator:    "\n\n",
 	})
