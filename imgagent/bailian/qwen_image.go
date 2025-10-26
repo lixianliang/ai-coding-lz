@@ -117,13 +117,13 @@ func buildImagePrompt(sceneContent string, summary string, roles []RoleInfo) str
 	}
 
 	if len(roles) > 0 {
-		prompt += "主要角色：\n"
+		prompt += "主要角色信息：\n"
 		for _, role := range roles {
 			if role.Appearance != "" {
-				prompt += fmt.Sprintf("- %s：%s\n", role.Name, role.Appearance)
+				prompt += fmt.Sprintf("- %s：%s；%s\n", role.Name, role.Character, role.Appearance)
 			}
 		}
-		prompt += "\n"
+		prompt += "使用规则：场景描述中提到的人物需参考对应的角色信息\n"
 	}
 
 	prompt += fmt.Sprintf("场景描述：%s", sceneContent)
