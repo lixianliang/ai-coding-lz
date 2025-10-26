@@ -87,15 +87,7 @@ func (s *Service) HandleCreateDocument(c *gin.Context) {
 	}
 	defer os.Remove(tempFilename) // 临时文件使用后删除
 
-	// 保存永久文件（用于后续上传到百炼）
-	permanentFilename := s.conf.Temp + "/" + docID + "." + ext
-	err = c.SaveUploadedFile(file, permanentFilename)
-	if err != nil {
-		log.Errorf("Failed to save permanent file, err: %v", err)
-		hutil.AbortError(c, hutil.ErrServerInternalCode, "save file failed")
-		return
-	}
-
+	// 分割章节
 	chunkOverlap := 100
 	texts, err := spliter.Split(ctx, tempFilename, spliter.Option{
 		ChunkSize:    2000,
@@ -104,22 +96,30 @@ func (s *Service) HandleCreateDocument(c *gin.Context) {
 	})
 	if err != nil {
 		log.Errorf("Failed to split text, err: %v", err)
-		os.Remove(permanentFilename) // 清理永久文件
 		hutil.AbortError(c, hutil.ErrServerInternalCode, "split text failed")
 		return
 	}
 
 	err = s.db.CreateChapters(ctx, docID, texts)
 	if err != nil {
-		log.Errorf("Failed to create Chapters, err: %v", err)
-		hutil.AbortError(c, hutil.ErrServerInternalCode, "create Chapters failed")
+		log.Errorf("Failed to create chapters, err: %v", err)
+		hutil.AbortError(c, hutil.ErrServerInternalCode, "create chapters failed")
+		return
+	}
+
+	// 上传文件到百炼
+	log.Infof("Uploading file to Bailian, filename: %s", tempFilename)
+	fileID, err := s.bailianClient.UploadFile(ctx, tempFilename)
+	if err != nil {
+		log.Errorf("Failed to upload file to Bailian, doc: %s, filename: %s, err: %v", docID, tempFilename, err)
+		hutil.AbortError(c, hutil.ErrServerInternalCode, "upload file to Bailian failed")
 		return
 	}
 
 	args := &api.CreateDocumentArgs{
 		Name: name,
 	}
-	doc, err := s.db.CreateDocument(ctx, docID, args)
+	doc, err := s.db.CreateDocument(ctx, docID, fileID, args)
 	if err != nil {
 		log.Errorf("Failed to create document, err: %v", err)
 		documentErr(c, err, "create document failed")
@@ -330,16 +330,16 @@ func (s *Service) HandleListChapters(c *gin.Context) {
 	}
 
 	// todo： 后续需要考虑分页
-	log.Infof("List Chapters, docID: %s", docID)
-	Chapters, err := s.db.ListChapters(ctx, docID)
+	log.Infof("List chapters, docID: %s", docID)
+	chapters, err := s.db.ListChapters(ctx, docID)
 	if err != nil {
-		log.Errorf("list Chapters failed, err: %v", err)
-		hutil.AbortError(c, http.StatusBadRequest, "list Chapters failed")
+		log.Errorf("list chapters failed, err: %v", err)
+		hutil.AbortError(c, http.StatusBadRequest, "list chapters failed")
 		return
 	}
 
 	result := &api.ListChaptersResult{}
-	for _, seg := range Chapters {
+	for _, seg := range chapters {
 		result.Chapters = append(result.Chapters, makeChapter(&seg))
 	}
 	hutil.WriteData(c, result)
