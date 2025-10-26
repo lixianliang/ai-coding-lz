@@ -42,18 +42,10 @@
           <el-tab-pane label="章节列表" name="chapters">
             <el-table :data="store.chapters" v-loading="loading" stripe>
               <el-table-column prop="index" label="序号" width="80" />
-              <el-table-column prop="title" label="标题" width="200" />
               <el-table-column prop="content" label="内容" show-overflow-tooltip />
               <el-table-column label="场景数" width="100">
                 <template #default="{ row }">
                   {{ row.scene_ids?.length || 0 }}
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="150" fixed="right">
-                <template #default="{ row }">
-                  <el-button type="primary" size="small" @click="handleViewScenes(row)">
-                    查看场景
-                  </el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -91,11 +83,6 @@ const showRoles = computed(() => {
   const status = store.currentDocument?.status
   return status === 'roleReady' || status === 'sceneReady' || status === 'imgReady'
 })
-
-const handleViewScenes = (chapter: any) => {
-  // 导航到章节场景页面
-  // 这里可以根据需要实现
-}
 
 onMounted(async () => {
   const id = route.params.id as string
