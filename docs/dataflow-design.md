@@ -20,15 +20,18 @@
   - 跳转到详情页
   - 开始轮询状态（每5秒）
     ↓
-后端 Worker 1 (场景提取):
+后端 Worker 1 (角色提取):
   - 轮询 chapterReady 文档（每30秒）
-  - 上传文件到阿里云百炼 → 获取 fileID
   - 调用 qwen-long 提取角色 → 保存到 Role 表
+  - 更新 Document.status = roleReady
+    ↓
+后端 Worker 2 (场景生成):
+  - 轮询 roleReady 文档（每30秒）
   - 遍历章节，调用 qwen-long 生成场景 → 保存到 Scene 表
   - 更新 Chapter.SceneIDs
   - 更新 Document.status = sceneReady
     ↓
-后端 Worker 2 (图片生成):
+后端 Worker 3 (图片生成):
   - 轮询 sceneReady 文档（每30秒）
   - 获取所有未生成图片的场景
   - 遍历场景，调用 qwen-image-plus 生成图片
@@ -68,15 +71,14 @@
 - 新增 N 条 Chapter 记录（N = 章节数）
 - temp 目录新增文件
 
-#### 阶段 2: 场景提取（异步）
-**时长：** 几分钟到几十分钟（取决于章节数和 LLM 响应速度）
+#### 阶段 2: 角色提取（异步）
+**时长：** 几分钟（取决于 LLM 响应速度）
 
 **Worker 1 处理流程：**
 
-**步骤 1: 上传文件到百炼**
-- 检查 Document.FileID 是否为空
-- 如果为空，从 temp 读取文件并上传
-- 更新 Document.FileID
+**步骤 1: 检查现有角色**
+- 查询文档是否已有角色记录
+- 如果已有角色，跳过提取步骤
 
 **步骤 2: 提取角色**
 - 构造角色提取 Prompt
@@ -84,26 +86,39 @@
 - 解析返回的 JSON 数组
 - 批量创建 Role 记录
 
-**步骤 3: 生成场景**
+**步骤 3: 更新状态**
+- 更新 Document.status = roleReady
+
+**数据变化：**
+- 新增 M 条 Role 记录（M = 角色数，通常 3-10）
+- Document.status 更新为 roleReady
+
+#### 阶段 3: 场景生成（异步）
+**时长：** 几分钟到几十分钟（取决于章节数和 LLM 响应速度）
+
+**Worker 2 处理流程：**
+
+**步骤 1: 获取章节**
+- 获取文档的所有章节
+
+**步骤 2: 生成场景**
 - 遍历所有章节
 - 为每个章节调用 qwen-long 生成场景（0-3个）
 - 为每个场景创建 Scene 记录
 - 更新 Chapter.SceneIDs
 
-**步骤 4: 更新状态**
+**步骤 3: 更新状态**
 - 更新 Document.status = sceneReady
 
 **数据变化：**
-- Document.FileID 更新
-- 新增 M 条 Role 记录（M = 角色数，通常 3-10）
 - 新增 K 条 Scene 记录（K = 场景总数，通常章节数 * 1-2）
 - Chapter.SceneIDs 更新
-- Document.status 更新
+- Document.status 更新为 sceneReady
 
-#### 阶段 3: 图片生成（异步）
+#### 阶段 4: 图片生成（异步）
 **时长：** 几分钟到几十分钟（取决于场景数和图片生成速度）
 
-**Worker 2 处理流程：**
+**Worker 3 处理流程：**
 
 **步骤 1: 获取待处理场景**
 - 查询所有 ImageURL 为空的场景
@@ -121,7 +136,7 @@
 - Scene.ImageURL 更新
 - Document.status 更新为 imgReady
 
-#### 阶段 4: 完成展示（前端）
+#### 阶段 5: 完成展示（前端）
 **前端操作：**
 1. 轮询检测到 status = imgReady
 2. 停止轮询
@@ -134,11 +149,11 @@
 ### 2.1 Document 状态流转
 
 ```
-[chapterReady] ────────────> [sceneReady] ────────────> [imgReady]
-   (初始状态)      Worker 1        (中间状态)      Worker 2      (最终状态)
+[chapterReady] ─> [roleReady] ─> [sceneReady] ─> [imgReady]
+   (初始)    Worker 1   (中间1)   Worker 2    (中间2)   Worker 3  (最终)
        ↑                                                              
        │                                                              
-       └────────────── 错误重试保持状态 ───────────────┘
+       └───────── 错误重试保持状态 ─────────────┘
 ```
 
 ### 2.2 状态定义
@@ -146,30 +161,41 @@
 **chapterReady（章节就绪）**
 - 含义：文档上传成功，章节分割完成
 - 触发条件：文档上传 API 成功返回
-- 下一步：等待 Worker 1 提取角色和场景
+- 下一步：等待 Worker 1 提取角色
+
+**roleReady（角色就绪）**
+- 含义：角色提取完成
+- 触发条件：Worker 1 处理成功
+- 下一步：等待 Worker 2 生成场景
 
 **sceneReady（场景就绪）**
-- 含义：角色和场景提取完成
-- 触发条件：Worker 1 处理成功
-- 下一步：等待 Worker 2 生成图片
+- 含义：场景提取完成
+- 触发条件：Worker 2 处理成功
+- 下一步：等待 Worker 3 生成图片
 
 **imgReady（图片就绪）**
 - 含义：所有场景图片生成完成
-- 触发条件：Worker 2 处理成功
+- 触发条件：Worker 3 处理成功
 - 下一步：无，最终状态
 
 ### 2.3 状态转换条件
 
-**chapterReady → sceneReady:**
+**chapterReady → roleReady:**
 - 前置条件：
   - Document.status = chapterReady
+  - Document.FileID 不为空
+- 处理步骤：
+  - 提取角色信息
+- 后置条件：
+  - Role 记录已创建（至少1个）
+
+**roleReady → sceneReady:**
+- 前置条件：
+  - Document.status = roleReady
   - 至少有一个 Chapter 记录
 - 处理步骤：
-  - 上传文件到百炼（如果 FileID 为空）
-  - 提取角色信息
   - 为每个章节生成场景
 - 后置条件：
-  - Role 记录已创建
   - Scene 记录已创建
   - Chapter.SceneIDs 已更新
 
@@ -187,27 +213,30 @@
 **原则：失败保持当前状态，下次轮询继续处理**
 
 **场景 1: Worker 1 处理失败**
-- 情况：API 调用失败、解析错误等
+- 情况：角色提取 API 调用失败、解析错误、未提取到角色等
 - 处理：记录错误日志，保持 chapterReady 状态
 - 恢复：下次轮询重新处理
+- 幂等性：处理前检查是否已有角色，如有则跳过
 
 **场景 2: Worker 2 处理失败**
+- 情况：场景生成 API 调用失败、解析错误等
+- 处理：记录错误日志，保持 roleReady 状态
+- 恢复：下次轮询重新处理
+
+**场景 3: Worker 3 处理失败**
 - 情况：图片生成失败
 - 处理：记录错误日志，保持 sceneReady 状态
 - 恢复：下次轮询继续处理未完成的场景
-
-**场景 3: 部分成功**
-- Worker 1: 如果角色提取成功但场景生成部分失败，下次重新处理
-- Worker 2: 只处理 ImageURL 为空的场景，已成功的不重复处理
+- 幂等性：只处理 ImageURL 为空的场景，已成功的不重复处理
 
 ## 三、轮询机制设计
 
 ### 3.1 后端 Worker 轮询
 
-#### Worker 1: 场景提取轮询
+#### Worker 1: 角色提取轮询
 
 **配置：**
-- 轮询间隔：30秒（可配置）
+- 轮询间隔：30秒（可配置 handle_role_interval_secs）
 - 并发控制：串行处理，一次处理一个文档
 
 **轮询逻辑：**
@@ -215,20 +244,43 @@
 每 30 秒：
   1. 查询 status = chapterReady 的文档
   2. 逐个处理：
+     - 调用 HandleDocumentRole
+     - 成功：更新状态为 roleReady
+     - 失败：记录日志，跳过，下次继续
+```
+
+**优化考虑：**
+- 按创建时间排序，优先处理旧文档
+- 可以限制每次处理的文档数量
+- 记录处理耗时，监控性能
+
+#### Worker 2: 场景生成轮询
+
+**配置：**
+- 轮询间隔：30秒（可配置 handle_scene_interval_secs）
+- 并发控制：串行处理
+
+**轮询逻辑：**
+```
+每 30 秒：
+  1. 查询 status = roleReady 的文档
+  2. 逐个处理：
      - 调用 HandleDocumentScene
+     - 获取所有章节
+     - 为每章节生成场景
      - 成功：更新状态为 sceneReady
      - 失败：记录日志，跳过，下次继续
 ```
 
 **优化考虑：**
-- 可以按创建时间排序，优先处理旧文档
+- 按创建时间排序，优先处理旧文档
 - 可以限制每次处理的文档数量
-- 可以记录处理耗时，监控性能
+- 记录处理耗时，监控性能
 
-#### Worker 2: 图片生成轮询
+#### Worker 3: 图片生成轮询
 
 **配置：**
-- 轮询间隔：30秒（可配置）
+- 轮询间隔：30秒（可配置 handle_image_gen_interval_secs）
 - 并发控制：串行处理
 
 **轮询逻辑：**
@@ -236,6 +288,7 @@
 每 30 秒：
   1. 查询 status = sceneReady 的文档
   2. 逐个处理：
+     - 调用 HandleDocumentImageGen
      - 获取未生成图片的场景
      - 逐个生成图片
      - 成功：更新状态为 imgReady
@@ -304,16 +357,17 @@ const startPolling = (docId: string) => {
 
 **解决方案：**
 
-**角色提取：**
-- 每次处理前先删除该文档的所有角色
-- 重新提取并创建
+**角色提取（Worker 1）：**
+- 每次处理前检查是否已有角色记录
+- 如果已有角色，直接跳过，不重复提取
+- 保证角色提取只执行一次
 
-**场景生成：**
+**场景生成（Worker 2）：**
 - 检查 Chapter.SceneIDs 是否为空
 - 如果已有场景，跳过该章节
 - 或者删除旧场景，重新生成
 
-**图片生成：**
+**图片生成（Worker 3）：**
 - 只查询 ImageURL 为空的场景
 - 已生成的不重复处理
 

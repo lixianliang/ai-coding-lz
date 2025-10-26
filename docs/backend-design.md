@@ -20,12 +20,12 @@ type Document struct {
 **字段说明：**
 - `ID`: 32位 UUID，主键
 - `Name`: 文档名称，唯一索引，最大128字符
-- `FileID`: 阿里云百炼返回的文件ID，用于后续调用 qwen-long
+- `FileID`: 阿里云百炼返回的文件ID，用于后续调用 qwen-long（在文档上传时已设置）
 - `Status`: 文档状态，取值：
-  - `chapterReady`: 章节分割完成，等待角色提取
-  - `roleReady`: 角色提取完成，等待场景提取
-  - `sceneReady`: 场景提取完成，等待图片生成
-  - `imgReady`: 图片生成完成
+  - `chapterReady`: 章节分割完成，等待角色提取（Worker 1）
+  - `roleReady`: 角色提取完成，等待场景生成（Worker 2）
+  - `sceneReady`: 场景生成完成，等待图片生成（Worker 3）
+  - `imgReady`: 图片生成完成（最终状态）
 - `CreatedAt`: 创建时间
 - `UpdatedAt`: 更新时间
 
@@ -160,7 +160,8 @@ ListDocuments(ctx) ([]Document, error)
 // 新增方法
 UpdateDocumentFileID(ctx, id, fileID) error  // 更新 FileID
 ListChapterReadyDocuments(ctx) ([]Document, error)  // 查询 chapterReady 状态
-ListSceneReadyDocuments(ctx) ([]Document, error)    // 查询 sceneReady 状态
+ListRoleReadyDocuments(ctx) ([]Document, error)      // 查询 roleReady 状态
+ListSceneReadyDocuments(ctx) ([]Document, error)     // 查询 sceneReady 状态
 ```
 
 #### Chapter DAO
@@ -479,7 +480,8 @@ func (c *Client) GenerateImage(ctx context.Context, sceneContent string) (string
 ```go
 type DocumentConfig struct {
     Enable                       bool `json:"enable"`                          // 是否启用异步任务
-    HandleSceneIntervalSecs      int  `json:"handle_scene_interval_secs"`      // 场景提取轮询间隔（秒）
+    HandleRoleIntervalSecs       int  `json:"handle_role_interval_secs"`       // 角色提取轮询间隔（秒）
+    HandleSceneIntervalSecs      int  `json:"handle_scene_interval_secs"`      // 场景生成轮询间隔（秒）
     HandleImageGenIntervalSecs   int  `json:"handle_image_gen_interval_secs"`  // 图片生成轮询间隔（秒）
 }
 ```
@@ -495,6 +497,9 @@ type DocumentMgr struct {
 }
 
 func NewDocumentMgr(config DocumentConfig, db db.IDataBase, bailianClient *bailian.Client) (*DocumentMgr, error) {
+    if config.HandleRoleIntervalSecs == 0 {
+        config.HandleRoleIntervalSecs = 30
+    }
     if config.HandleSceneIntervalSecs == 0 {
         config.HandleSceneIntervalSecs = 30
     }
@@ -513,7 +518,7 @@ func NewDocumentMgr(config DocumentConfig, db db.IDataBase, bailianClient *baili
 
 ### 3.3 Worker 架构
 
-#### Worker 1: 场景提取 Worker
+#### Worker 1: 角色提取 Worker
 
 **启动方式：**
 ```go
@@ -521,19 +526,35 @@ func (m *DocumentMgr) Run() {
     if !m.config.Enable {
         return
     }
-    go m.loopHandleSceneTasks()
+    go m.loopHandleDocumentRoleTasks()
+    go m.loopHandleDocumentSceneTasks()
     go m.loopHandleImageGenTasks()
 }
 
-func (m *DocumentMgr) loopHandleSceneTasks() {
+func (m *DocumentMgr) loopHandleDocumentRoleTasks() {
+    ticker := time.NewTicker(time.Duration(m.config.HandleRoleIntervalSecs) * time.Second)
+    defer ticker.Stop()
+    
+    for {
+        select {
+        case <-ticker.C:
+            ctx := logger.NewContext(fmt.Sprintf("HandleDocumentRoleTasks-%d", time.Now().Unix()))
+            m.HandleDocumentRoleTasks(ctx)
+        case <-m.close:
+            return
+        }
+    }
+}
+
+func (m *DocumentMgr) loopHandleDocumentSceneTasks() {
     ticker := time.NewTicker(time.Duration(m.config.HandleSceneIntervalSecs) * time.Second)
     defer ticker.Stop()
     
     for {
         select {
         case <-ticker.C:
-            ctx := logger.NewContext(fmt.Sprintf("HandleSceneTasks-%d", time.Now().Unix()))
-            m.HandleSceneTasks(ctx)
+            ctx := logger.NewContext(fmt.Sprintf("HandleDocumentSceneTasks-%d", time.Now().Unix()))
+            m.HandleDocumentSceneTasks(ctx)
         case <-m.close:
             return
         }
@@ -543,7 +564,7 @@ func (m *DocumentMgr) loopHandleSceneTasks() {
 
 **处理流程：**
 ```go
-func (m *DocumentMgr) HandleSceneTasks(ctx context.Context) {
+func (m *DocumentMgr) HandleDocumentRoleTasks(ctx context.Context) {
     log := logger.FromContext(ctx)
     
     // 1. 查询 chapterReady 状态的文档
@@ -555,82 +576,132 @@ func (m *DocumentMgr) HandleSceneTasks(ctx context.Context) {
     
     // 2. 逐个处理文档
     for _, doc := range docs {
-        if err := m.HandleDocumentScene(ctx, doc); err != nil {
-            log.Errorf("Failed to handle document scene, doc: %v, err: %v", doc.ID, err)
-            continue  // 失败保持状态，下次继续处理
+        err = m.HandleDocumentRole(ctx, doc)
+        if err != nil {
+            log.Errorf("Failed to handle document role, doc: %v, err: %v", doc, err)
+            continue
         }
-        
-        // 3. 更新文档状态为 sceneReady
-        if err := m.db.UpdateDocumentStatus(ctx, doc.ID, db.DocumentStatusSceneReady); err != nil {
-            log.Errorf("Failed to update document status, doc: %v, err: %v", doc.ID, err)
+        err = m.db.UpdateDocumentStatus(ctx, doc.ID, db.DocumentStatusRoleReady)
+        if err != nil {
+            log.Errorf("Failed to update document status, err: %v", err)
+            continue
+        }
+    }
+}
+
+func (m *DocumentMgr) HandleDocumentRole(ctx context.Context, doc db.Document) error {
+    log := logger.FromContext(ctx)
+    log.Infof("Handling document role extraction, docID: %s", doc.ID)
+    
+    // 检查是否已有角色
+    existingRoles, err := m.db.ListRolesByDocument(ctx, doc.ID)
+    if err != nil {
+        log.Errorf("Failed to list existing roles, doc: %s, err: %v", doc.ID, err)
+        return err
+    }
+    
+    if len(existingRoles) > 0 {
+        log.Infof("Roles already exist for doc: %s, count: %d", doc.ID, len(existingRoles))
+        return nil
+    }
+    
+    // 提取角色
+    log.Infof("Extracting roles, docID: %s", doc.ID)
+    roles, err := m.bailianClient.ExtractRoles(ctx, doc.FileID)
+    if err != nil {
+        log.Errorf("Failed to extract roles, doc: %s, err: %v", doc.ID, err)
+        return err
+    }
+    
+    // 角色不允许为空
+    if len(roles) == 0 {
+        log.Errorf("No roles extracted for doc: %s", doc.ID)
+        return fmt.Errorf("no roles extracted")
+    }
+    
+    // 保存角色到数据库
+    dbRoles := make([]db.Role, 0, len(roles))
+    now := time.Now()
+    for _, r := range roles {
+        dbRoles = append(dbRoles, db.Role{
+            ID:         db.MakeUUID(),
+            DocumentID: doc.ID,
+            Name:       r.Name,
+            Gender:     r.Gender,
+            Character:  r.Character,
+            Appearance: r.Appearance,
+            CreatedAt:  now,
+            UpdatedAt:  now,
+        })
+    }
+    
+    err = m.db.CreateRoles(ctx, dbRoles)
+    if err != nil {
+        log.Errorf("Failed to create roles, doc: %s, err: %v", doc.ID, err)
+        return err
+    }
+    
+    log.Infof("Created %d roles for doc: %s", len(dbRoles), doc.ID)
+    return nil
+}
+```
+
+#### Worker 2: 场景生成 Worker
+
+**启动方式：** 已包含在 Run() 方法中
+
+**处理流程：**
+```go
+func (m *DocumentMgr) HandleDocumentSceneTasks(ctx context.Context) {
+    log := logger.FromContext(ctx)
+    
+    docs, err := m.db.ListRoleReadyDocuments(ctx)
+    if err != nil {
+        log.Errorf("Failed to list roleReady documents, err: %v", err)
+        return
+    }
+    
+    for _, doc := range docs {
+        err = m.HandleDocumentScene(ctx, doc)
+        if err != nil {
+            log.Errorf("Failed to handle document scene, doc: %v, err: %v", doc, err)
+            continue
+        }
+        err = m.db.UpdateDocumentStatus(ctx, doc.ID, db.DocumentStatusSceneReady)
+        if err != nil {
+            log.Errorf("Failed to update document status, err: %v", err)
+            continue
         }
     }
 }
 
 func (m *DocumentMgr) HandleDocumentScene(ctx context.Context, doc db.Document) error {
     log := logger.FromContext(ctx)
+    log.Infof("Handling document scene extraction, docID: %s", doc.ID)
     
-    // 1. 如果 FileID 为空，上传文件到阿里云百炼
-    if doc.FileID == "" {
-        // 需要从 temp 目录找到对应文件（根据 doc.ID）
-        filename := fmt.Sprintf("./temp/%s.txt", doc.ID)  // 需要调整
-        fileID, err := m.bailianClient.UploadFile(ctx, filename)
+    // 1. 获取所有章节
+    chapters, err := m.db.ListChapters(ctx, doc.ID)
+    if err != nil {
+        log.Errorf("Failed to list chapters, doc: %s, err: %v", doc.ID, err)
+        return err
+    }
+    
+    if len(chapters) == 0 {
+        log.Warnf("No chapters found for doc: %s", doc.ID)
+        return nil
+    }
+    
+    // 2. 为每个章节生成场景
+    for _, chapter := range chapters {
+        log.Infof("Generating scenes for chapter, chapterID: %s, index: %d", chapter.ID, chapter.Index)
+        
+        scenes, err := m.bailianClient.GenerateScenes(ctx, chapter.Content)
         if err != nil {
-            log.Errorf("Failed to upload file, doc: %v, err: %v", doc.ID, err)
+            log.Errorf("Failed to generate scenes, chapter: %s, err: %v", chapter.ID, err)
             return err
         }
         
-        // 更新 FileID
-        if err := m.db.UpdateDocumentFileID(ctx, doc.ID, fileID); err != nil {
-            log.Errorf("Failed to update fileID, doc: %v, err: %v", doc.ID, err)
-            return err
-        }
-        doc.FileID = fileID
-    }
-    
-    // 2. 提取角色信息
-    roles, err := m.bailianClient.ExtractRoles(ctx, doc.FileID)
-    if err != nil {
-        log.Errorf("Failed to extract roles, doc: %v, err: %v", doc.ID, err)
-        return err
-    }
-    
-    // 保存角色到数据库
-    if len(roles) > 0 {
-        dbRoles := make([]db.Role, 0, len(roles))
-        now := time.Now()
-        for _, r := range roles {
-            dbRoles = append(dbRoles, db.Role{
-                ID:         db.MakeUUID(),
-                DocumentID: doc.ID,
-                Name:       r.Name,
-                Gender:     r.Gender,
-                Character:  r.Character,
-                Appearance: r.Appearance,
-                CreatedAt:  now,
-                UpdatedAt:  now,
-            })
-        }
-        if err := m.db.CreateRoles(ctx, dbRoles); err != nil {
-            log.Errorf("Failed to create roles, doc: %v, err: %v", doc.ID, err)
-            return err
-        }
-    }
-    
-    // 3. 获取所有章节
-    chapters, err := m.db.ListChapters(ctx, doc.ID)
-    if err != nil {
-        log.Errorf("Failed to list chapters, doc: %v, err: %v", doc.ID, err)
-        return err
-    }
-    
-    // 4. 为每个章节生成场景
-    for _, chapter := range chapters {
-        scenes, err := m.bailianClient.GenerateScenes(ctx, chapter.Content)
-        if err != nil {
-            log.Errorf("Failed to generate scenes, chapter: %v, err: %v", chapter.ID, err)
-            return err
-        }
+        log.Infof("Generated %d scenes for chapter: %s", len(scenes), chapter.ID)
         
         // 保存场景到数据库
         if len(scenes) > 0 {
@@ -652,26 +723,31 @@ func (m *DocumentMgr) HandleDocumentScene(ctx context.Context, doc db.Document) 
                 })
             }
             
-            if err := m.db.CreateScenes(ctx, dbScenes); err != nil {
-                log.Errorf("Failed to create scenes, chapter: %v, err: %v", chapter.ID, err)
+            err = m.db.CreateScenes(ctx, dbScenes)
+            if err != nil {
+                log.Errorf("Failed to create scenes, chapter: %s, err: %v", chapter.ID, err)
                 return err
             }
             
             // 更新 Chapter 的 SceneIDs
-            if err := m.db.UpdateChapterSceneIDs(ctx, chapter.ID, sceneIDs); err != nil {
-                log.Errorf("Failed to update chapter sceneIDs, chapter: %v, err: %v", chapter.ID, err)
+            err = m.db.UpdateChapterSceneIDs(ctx, chapter.ID, sceneIDs)
+            if err != nil {
+                log.Errorf("Failed to update chapter sceneIDs, chapter: %s, err: %v", chapter.ID, err)
                 return err
             }
         }
     }
     
+    log.Infof("Scene extraction completed for doc: %s", doc.ID)
     return nil
 }
 ```
 
-#### Worker 2: 图片生成 Worker
+#### Worker 3: 图片生成 Worker
 
-**启动方式：**
+**启动方式：** 已包含在 Run() 方法中
+
+**处理流程：**
 ```go
 func (m *DocumentMgr) loopHandleImageGenTasks() {
     ticker := time.NewTicker(time.Duration(m.config.HandleImageGenIntervalSecs) * time.Second)
@@ -759,18 +835,21 @@ func (m *DocumentMgr) HandleDocumentImageGen(ctx context.Context, doc db.Documen
 [chapterReady]  ← 章节分割完成
     ↓
     ↓ (Worker 1: 角色提取)
+    ↓ - 检查是否已有角色
     ↓ - 提取角色信息
     ↓ - 保存到数据库
     ↓
 [roleReady]  ← 角色提取完成
     ↓
     ↓ (Worker 2: 场景生成)
+    ↓ - 获取所有章节
     ↓ - 为每章节生成场景
     ↓ - 保存场景到数据库
     ↓
-[sceneReady]  ← 场景提取完成
+[sceneReady]  ← 场景生成完成
     ↓
     ↓ (Worker 3: 图片生成)
+    ↓ - 获取未生成图片的场景
     ↓ - 为每个场景生成图片
     ↓ - 更新场景图片URL
     ↓
@@ -1040,6 +1119,7 @@ authGroup.GET("/chapters/:chapter_id/scenes", s.HandleListScenesByChapter)
     },
     "document_mgr": {
         "enable": true,
+        "handle_role_interval_secs": 30,
         "handle_scene_interval_secs": 30,
         "handle_image_gen_interval_secs": 30
     }
@@ -1062,7 +1142,8 @@ authGroup.GET("/chapters/:chapter_id/scenes", s.HandleListScenesByChapter)
 #### document_mgr 配置段
 
 - `enable`: 是否启用异步任务管理器
-- `handle_scene_interval_secs`: 场景提取轮询间隔（秒）
+- `handle_role_interval_secs`: 角色提取轮询间隔（秒）
+- `handle_scene_interval_secs`: 场景生成轮询间隔（秒）
 - `handle_image_gen_interval_secs`: 图片生成轮询间隔（秒）
 
 ### 5.3 配置加载
