@@ -27,6 +27,7 @@ type Document struct {
 	ID        string    `gorm:"primaryKey;size:32;comment:'主键'"`
 	Name      string    `gorm:"uniqueIndex:uk_name;size:128;comment:'文档名称'"`
 	FileID    string    `gorm:"size:255;comment:'存储在阿里云百炼的 fileid'"`
+	Summary   string    `gorm:"size:1000;comment:'小说摘要'"`
 	Status    string    `gorm:"size:20;comment:'状态 indexing|ready'"`
 	CreatedAt time.Time `gorm:"comment:'创建时间'"`
 	UpdatedAt time.Time `gorm:"comment:'更新时间'"`
@@ -145,6 +146,17 @@ func (db *Database) ListDocuments(ctx context.Context) ([]Document, error) {
 
 func (db *Database) UpdateDocumentFileID(ctx context.Context, id string, fileID string) error {
 	rowsAffected, err := gorm.G[Document](db.db).Where("id = ?", id).Update(ctx, "file_id", fileID)
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (db *Database) UpdateDocumentSummary(ctx context.Context, id string, summary string) error {
+	rowsAffected, err := gorm.G[Document](db.db).Where("id = ?", id).Update(ctx, "summary", summary)
 	if err != nil {
 		return err
 	}

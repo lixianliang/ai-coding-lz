@@ -13,19 +13,62 @@ import (
 	"imgagent/pkg/logger"
 )
 
-// ExtractRoles 从文档中提取角色信息
-// 使用 qwen-long 分析整个文档
-func (c *Client) ExtractRoles(ctx context.Context, fileID string) ([]RoleInfo, error) {
+// ExtractSummary 提取整个小说的摘要
+func (c *Client) ExtractSummary(ctx context.Context, fileID string) (string, error) {
 	log := logger.FromContext(ctx)
-	log.Infof("Extracting roles from document, fileID: %s", fileID)
+	log.Infof("Extracting summary from document, fileID: %s", fileID)
 
-	// 构建请求
 	req := ChatCompletionRequest{
 		Model: "qwen-long",
 		Messages: []Message{
 			{Role: "system", Content: "You are a helpful assistant."},
 			{Role: "system", Content: fmt.Sprintf("fileid://%s", fileID)},
-			{Role: "user", Content: c.config.RolePrompt},
+			{Role: "user", Content: c.config.SummaryPrompt},
+		},
+		Stream: false,
+	}
+
+	respBody, err := c.callChatCompletion(ctx, req)
+	if err != nil {
+		return "", err
+	}
+
+	var chatResp ChatCompletionResponse
+	err = json.Unmarshal(respBody, &chatResp)
+	if err != nil {
+		log.Errorf("Failed to parse chat response, err: %v, body: %s", err, string(respBody))
+		return "", fmt.Errorf("parse chat response failed: %w", err)
+	}
+
+	if len(chatResp.Choices) == 0 {
+		log.Warnf("No choices in response, body: %s", string(respBody))
+		return "", fmt.Errorf("no choices in response")
+	}
+
+	summary := strings.TrimSpace(chatResp.Choices[0].Message.Content)
+	log.Infof("Extracted summary (length: %d): %s", len(summary), summary)
+
+	return summary, nil
+}
+
+// ExtractRoles 从文档中提取角色信息
+// 使用 qwen-long 分析整个文档
+func (c *Client) ExtractRoles(ctx context.Context, fileID string, summary string) ([]RoleInfo, error) {
+	log := logger.FromContext(ctx)
+	log.Infof("Extracting roles from document, fileID: %s", fileID)
+
+	// 构建请求
+	prompt := c.config.RolePrompt
+	if summary != "" {
+		prompt = fmt.Sprintf("小说摘要：\n%s\n\n%s", summary, c.config.RolePrompt)
+	}
+
+	req := ChatCompletionRequest{
+		Model: "qwen-long",
+		Messages: []Message{
+			{Role: "system", Content: "You are a helpful assistant."},
+			{Role: "system", Content: fmt.Sprintf("fileid://%s", fileID)},
+			{Role: "user", Content: prompt},
 		},
 		Stream: false,
 	}

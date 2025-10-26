@@ -129,7 +129,32 @@ func (m *DocumentMgr) HandleDocumentRole(ctx context.Context, doc db.Document) e
 	log := logger.FromContext(ctx)
 	log.Infof("Handling document role extraction, docID: %s", doc.ID)
 
-	// 检查是否已有角色
+	// 1. 先提取摘要
+	if doc.Summary == "" {
+		log.Infof("Extracting summary, docID: %s", doc.ID)
+		summary, err := m.bailianClient.ExtractSummary(ctx, doc.FileID)
+		if err != nil {
+			log.Errorf("Failed to extract summary, doc: %s, err: %v", doc.ID, err)
+			return err
+		}
+
+		if summary == "" {
+			log.Warnf("Empty summary extracted for doc: %s", doc.ID)
+		}
+
+		err = m.db.UpdateDocumentSummary(ctx, doc.ID, summary)
+		if err != nil {
+			log.Errorf("Failed to update document summary, doc: %s, err: %v", doc.ID, err)
+			return err
+		}
+
+		doc.Summary = summary
+		log.Infof("Summary extracted and saved for doc: %s, length: %d", doc.ID, len(summary))
+	} else {
+		log.Infof("Summary already exists for doc: %s", doc.ID)
+	}
+
+	// 2. 检查是否已有角色
 	existingRoles, err := m.db.ListRolesByDocument(ctx, doc.ID)
 	if err != nil {
 		log.Errorf("Failed to list existing roles, doc: %s, err: %v", doc.ID, err)
@@ -141,9 +166,9 @@ func (m *DocumentMgr) HandleDocumentRole(ctx context.Context, doc db.Document) e
 		return nil
 	}
 
-	// 提取角色
+	// 3. 提取角色（传入摘要以获得更好的结果）
 	log.Infof("Extracting roles, docID: %s", doc.ID)
-	roles, err := m.bailianClient.ExtractRoles(ctx, doc.FileID)
+	roles, err := m.bailianClient.ExtractRoles(ctx, doc.FileID, doc.Summary)
 	if err != nil {
 		log.Errorf("Failed to extract roles, doc: %s, err: %v", doc.ID, err)
 		return err
@@ -155,7 +180,7 @@ func (m *DocumentMgr) HandleDocumentRole(ctx context.Context, doc db.Document) e
 		return fmt.Errorf("no roles extracted")
 	}
 
-	// 保存角色到数据库
+	// 4. 保存角色到数据库
 	dbRoles := make([]db.Role, 0, len(roles))
 	now := time.Now()
 	for _, r := range roles {
@@ -306,7 +331,25 @@ func (m *DocumentMgr) HandleDocumentImageGen(ctx context.Context, doc db.Documen
 	log := logger.FromContext(ctx)
 	log.Infof("Handling document image generation, docID: %s", doc.ID)
 
-	// 1. 获取所有未生成图片的场景
+	// 1. 获取文档的角色信息
+	dbRoles, err := m.db.ListRolesByDocument(ctx, doc.ID)
+	if err != nil {
+		log.Errorf("Failed to list roles, doc: %s, err: %v", doc.ID, err)
+		return err
+	}
+
+	// 转换为 bailian.RoleInfo
+	roles := make([]bailian.RoleInfo, 0, len(dbRoles))
+	for _, r := range dbRoles {
+		roles = append(roles, bailian.RoleInfo{
+			Name:       r.Name,
+			Gender:     r.Gender,
+			Character:  r.Character,
+			Appearance: r.Appearance,
+		})
+	}
+
+	// 2. 获取所有未生成图片的场景
 	scenes, err := m.db.ListPendingImageScenes(ctx, doc.ID)
 	if err != nil {
 		log.Errorf("Failed to list pending image scenes, doc: %s, err: %v", doc.ID, err)
@@ -320,11 +363,11 @@ func (m *DocumentMgr) HandleDocumentImageGen(ctx context.Context, doc db.Documen
 
 	log.Infof("Found %d pending image scenes for doc: %s", len(scenes), doc.ID)
 
-	// 2. 为每个场景生成图片
+	// 3. 为每个场景生成图片（包含摘要和角色信息）
 	for _, scene := range scenes {
 		log.Infof("Generating image for scene, sceneID: %s, content: %s", scene.ID, scene.Content)
 
-		imageURL, err := m.bailianClient.GenerateImage(ctx, scene.Content)
+		imageURL, err := m.bailianClient.GenerateImage(ctx, scene.Content, doc.Summary, roles)
 		if err != nil {
 			log.Errorf("Failed to generate image, scene: %s, err: %v", scene.ID, err)
 			return err // 失败则整个文档重试
