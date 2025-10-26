@@ -1,10 +1,52 @@
 # ImgAgent API 文档
 
+## 概述
+
+ImgAgent 是一个连环动漫智能体后端服务，使用 Go 语言实现，基于 Gin 框架构建 RESTful API。该服务可根据用户上传的小说文本，自动理解小说内容、提取人物特征和场景信息，生成连环画风格的动漫内容。
+
+### 技术栈
+
+- 编程语言: Go
+- HTTP框架: Gin
+- 数据库: MySQL 8.4
+- ORM: GORM
+- 日志: Zap
+
 ## 基础信息
 
 - **Base URL**: `http://localhost:8000`
 - **API Version**: `/v1`
 - **认证方式**: Bearer Token (当前暂未启用)
+
+## 响应格式
+
+所有 API 接口统一使用以下响应格式：
+
+```json
+{
+  "code": 200,
+  "message": "",
+  "reqid": "<请求ID>",
+  "data": {}
+}
+```
+
+**字段说明**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| code | int | 业务处理状态码，200 表示成功，非 200 表示失败 |
+| message | string | 错误信息，成功时为空 |
+| reqid | string | 请求唯一标识，用于追踪和日志记录 |
+| data | object | 业务返回数据，具体结构见各接口说明 |
+
+**注意事项**
+
+- HTTP 状态码为 200 表示服务接受并处理了请求
+- 具体业务是否成功需查看响应 body 中的 `code` 字段
+- `code` 为 200 表示业务处理成功，非 200 表示业务处理失败
+- 失败时 `message` 字段包含详细的错误信息
+- 每个请求都会在响应头中返回 `x-reqid`，与响应 body 中的 `reqid` 相同
 
 ## API 端点
 
@@ -40,15 +82,20 @@ Content-Type: multipart/form-data
 
 ```json
 {
-  "id": "文档ID",
-  "name": "文档名称",
-  "status": "chapterReady",
-  "created_at": "2024-10-24 12:00:00",
-  "updated_at": "2024-10-24 12:00:00"
+  "code": 200,
+  "message": "",
+  "reqid": "abc123-def456-ghi789",
+  "data": {
+    "id": "文档ID",
+    "name": "文档名称",
+    "status": "chapterReady",
+    "created_at": "2024-10-24 12:00:00",
+    "updated_at": "2024-10-24 12:00:00"
+  }
 }
 ```
 
-**状态码**
+**业务状态码**
 
 - `200`: 创建成功
 - `400`: 请求参数错误
@@ -80,15 +127,20 @@ GET /v1/documents/:document_id
 
 ```json
 {
-  "id": "文档ID",
-  "name": "文档名称",
-  "status": "sceneReady",
-  "created_at": "2024-10-24 12:00:00",
-  "updated_at": "2024-10-24 12:00:00"
+  "code": 200,
+  "message": "",
+  "reqid": "abc123-def456-ghi789",
+  "data": {
+    "id": "文档ID",
+    "name": "文档名称",
+    "status": "sceneReady",
+    "created_at": "2024-10-24 12:00:00",
+    "updated_at": "2024-10-24 12:00:00"
+  }
 }
 ```
 
-**状态码**
+**业务状态码**
 
 - `200`: 获取成功
 - `400`: 文档ID无效
@@ -130,15 +182,20 @@ PUT /v1/documents/:document_id
 
 ```json
 {
-  "id": "文档ID",
-  "name": "新的文档名称",
-  "status": "sceneReady",
-  "created_at": "2024-10-24 12:00:00",
-  "updated_at": "2024-10-24 12:30:00"
+  "code": 200,
+  "message": "",
+  "reqid": "abc123-def456-ghi789",
+  "data": {
+    "id": "文档ID",
+    "name": "新的文档名称",
+    "status": "sceneReady",
+    "created_at": "2024-10-24 12:00:00",
+    "updated_at": "2024-10-24 12:30:00"
+  }
 }
 ```
 
-**状态码**
+**业务状态码**
 
 - `200`: 更新成功
 - `400`: 请求参数错误
@@ -165,10 +222,15 @@ DELETE /v1/documents/:document_id
 **响应**
 
 ```json
-null
+{
+  "code": 200,
+  "message": "",
+  "reqid": "abc123-def456-ghi789",
+  "data": null
+}
 ```
 
-**状态码**
+**业务状态码**
 
 - `200`: 删除成功
 - `400`: 文档ID无效
@@ -193,26 +255,31 @@ GET /v1/documents
 
 ```json
 {
-  "documents": [
-    {
-      "id": "文档ID1",
-      "name": "文档名称1",
-      "status": "imgReady",
-      "created_at": "2024-10-24 12:00:00",
-      "updated_at": "2024-10-24 12:00:00"
-    },
-    {
-      "id": "文档ID2",
-      "name": "文档名称2",
-      "status": "chapterReady",
-      "created_at": "2024-10-24 13:00:00",
-      "updated_at": "2024-10-24 13:00:00"
-    }
-  ]
+  "code": 200,
+  "message": "",
+  "reqid": "abc123-def456-ghi789",
+  "data": {
+    "documents": [
+      {
+        "id": "文档ID1",
+        "name": "文档名称1",
+        "status": "imgReady",
+        "created_at": "2024-10-24 12:00:00",
+        "updated_at": "2024-10-24 12:00:00"
+      },
+      {
+        "id": "文档ID2",
+        "name": "文档名称2",
+        "status": "chapterReady",
+        "created_at": "2024-10-24 13:00:00",
+        "updated_at": "2024-10-24 13:00:00"
+      }
+    ]
+  }
 }
 ```
 
-**状态码**
+**业务状态码**
 
 - `200`: 获取成功
 
@@ -245,18 +312,23 @@ GET /v1/documents/:document_id/chapters/:id
 
 ```json
 {
-  "id": "章节ID",
-  "index": 0,
-  "document_id": "文档ID",
-  "title": "章节标题",
-  "content": "章节内容",
-  "scene_ids": ["场景ID1", "场景ID2"],
-  "created_at": "2024-10-24 12:00:00",
-  "updated_at": "2024-10-24 12:00:00"
+  "code": 200,
+  "message": "",
+  "reqid": "abc123-def456-ghi789",
+  "data": {
+    "id": "章节ID",
+    "index": 0,
+    "document_id": "文档ID",
+    "title": "章节标题",
+    "content": "章节内容",
+    "scene_ids": ["场景ID1", "场景ID2"],
+    "created_at": "2024-10-24 12:00:00",
+    "updated_at": "2024-10-24 12:00:00"
+  }
 }
 ```
 
-**状态码**
+**业务状态码**
 
 - `200`: 获取成功
 - `400`: 参数无效
@@ -299,18 +371,23 @@ PUT /v1/documents/:document_id/chapters/:id
 
 ```json
 {
-  "id": "章节ID",
-  "index": 0,
-  "document_id": "文档ID",
-  "title": "章节标题",
-  "content": "新的章节内容",
-  "scene_ids": ["场景ID1", "场景ID2"],
-  "created_at": "2024-10-24 12:00:00",
-  "updated_at": "2024-10-24 12:30:00"
+  "code": 200,
+  "message": "",
+  "reqid": "abc123-def456-ghi789",
+  "data": {
+    "id": "章节ID",
+    "index": 0,
+    "document_id": "文档ID",
+    "title": "章节标题",
+    "content": "新的章节内容",
+    "scene_ids": ["场景ID1", "场景ID2"],
+    "created_at": "2024-10-24 12:00:00",
+    "updated_at": "2024-10-24 12:30:00"
+  }
 }
 ```
 
-**状态码**
+**业务状态码**
 
 - `200`: 更新成功
 - `400`: 请求参数错误
@@ -338,10 +415,15 @@ DELETE /v1/documents/:document_id/chapters/:id
 **响应**
 
 ```json
-null
+{
+  "code": 200,
+  "message": "",
+  "reqid": "abc123-def456-ghi789",
+  "data": null
+}
 ```
 
-**状态码**
+**业务状态码**
 
 - `200`: 删除成功
 - `400`: 参数无效
@@ -369,32 +451,37 @@ GET /v1/documents/:document_id/chapters
 
 ```json
 {
-  "chapters": [
-    {
-      "id": "章节ID1",
-      "index": 0,
-      "document_id": "文档ID",
-      "title": "第一章",
-      "content": "章节内容1",
-      "scene_ids": ["场景ID1", "场景ID2"],
-      "created_at": "2024-10-24 12:00:00",
-      "updated_at": "2024-10-24 12:00:00"
-    },
-    {
-      "id": "章节ID2",
-      "index": 1,
-      "document_id": "文档ID",
-      "title": "第二章",
-      "content": "章节内容2",
-      "scene_ids": ["场景ID3"],
-      "created_at": "2024-10-24 12:00:00",
-      "updated_at": "2024-10-24 12:00:00"
-    }
-  ]
+  "code": 200,
+  "message": "",
+  "reqid": "abc123-def456-ghi789",
+  "data": {
+    "chapters": [
+      {
+        "id": "章节ID1",
+        "index": 0,
+        "document_id": "文档ID",
+        "title": "第一章",
+        "content": "章节内容1",
+        "scene_ids": ["场景ID1", "场景ID2"],
+        "created_at": "2024-10-24 12:00:00",
+        "updated_at": "2024-10-24 12:00:00"
+      },
+      {
+        "id": "章节ID2",
+        "index": 1,
+        "document_id": "文档ID",
+        "title": "第二章",
+        "content": "章节内容2",
+        "scene_ids": ["场景ID3"],
+        "created_at": "2024-10-24 12:00:00",
+        "updated_at": "2024-10-24 12:00:00"
+      }
+    ]
+  }
 }
 ```
 
-**状态码**
+**业务状态码**
 
 - `200`: 获取成功
 - `400`: 参数无效
@@ -428,32 +515,37 @@ GET /v1/documents/:document_id/roles
 
 ```json
 {
-  "roles": [
-    {
-      "id": "角色ID1",
-      "document_id": "文档ID",
-      "name": "张三",
-      "gender": "男",
-      "character": "勇敢、正直",
-      "appearance": "身材高大，浓眉大眼",
-      "created_at": "2024-10-24 12:00:00",
-      "updated_at": "2024-10-24 12:00:00"
-    },
-    {
-      "id": "角色ID2",
-      "document_id": "文档ID",
-      "name": "李四",
-      "gender": "女",
-      "character": "聪明、机智",
-      "appearance": "身材苗条，长发飘飘",
-      "created_at": "2024-10-24 12:00:00",
-      "updated_at": "2024-10-24 12:00:00"
-    }
-  ]
+  "code": 200,
+  "message": "",
+  "reqid": "abc123-def456-ghi789",
+  "data": {
+    "roles": [
+      {
+        "id": "角色ID1",
+        "document_id": "文档ID",
+        "name": "张三",
+        "gender": "男",
+        "character": "勇敢、正直",
+        "appearance": "身材高大，浓眉大眼",
+        "created_at": "2024-10-24 12:00:00",
+        "updated_at": "2024-10-24 12:00:00"
+      },
+      {
+        "id": "角色ID2",
+        "document_id": "文档ID",
+        "name": "李四",
+        "gender": "女",
+        "character": "聪明、机智",
+        "appearance": "身材苗条，长发飘飘",
+        "created_at": "2024-10-24 12:00:00",
+        "updated_at": "2024-10-24 12:00:00"
+      }
+    ]
+  }
 }
 ```
 
-**状态码**
+**业务状态码**
 
 - `200`: 获取成功
 - `400`: 参数无效
@@ -483,34 +575,39 @@ GET /v1/documents/:document_id/scenes
 
 ```json
 {
-  "scenes": [
-    {
-      "id": "场景ID1",
-      "chapter_id": "章节ID1",
-      "document_id": "文档ID",
-      "index": 0,
-      "content": "场景描述内容1",
-      "image_url": "https://example.com/image1.jpg",
-      "voice_url": "https://example.com/voice1.mp3",
-      "created_at": "2024-10-24 12:00:00",
-      "updated_at": "2024-10-24 12:00:00"
-    },
-    {
-      "id": "场景ID2",
-      "chapter_id": "章节ID1",
-      "document_id": "文档ID",
-      "index": 1,
-      "content": "场景描述内容2",
-      "image_url": "https://example.com/image2.jpg",
-      "voice_url": "",
-      "created_at": "2024-10-24 12:00:00",
-      "updated_at": "2024-10-24 12:00:00"
-    }
-  ]
+  "code": 200,
+  "message": "",
+  "reqid": "abc123-def456-ghi789",
+  "data": {
+    "scenes": [
+      {
+        "id": "场景ID1",
+        "chapter_id": "章节ID1",
+        "document_id": "文档ID",
+        "index": 0,
+        "content": "场景描述内容1",
+        "image_url": "https://example.com/image1.jpg",
+        "voice_url": "https://example.com/voice1.mp3",
+        "created_at": "2024-10-24 12:00:00",
+        "updated_at": "2024-10-24 12:00:00"
+      },
+      {
+        "id": "场景ID2",
+        "chapter_id": "章节ID1",
+        "document_id": "文档ID",
+        "index": 1,
+        "content": "场景描述内容2",
+        "image_url": "https://example.com/image2.jpg",
+        "voice_url": "",
+        "created_at": "2024-10-24 12:00:00",
+        "updated_at": "2024-10-24 12:00:00"
+      }
+    ]
+  }
 }
 ```
 
-**状态码**
+**业务状态码**
 
 - `200`: 获取成功
 - `400`: 参数无效
@@ -538,23 +635,28 @@ GET /v1/chapters/:chapter_id/scenes
 
 ```json
 {
-  "scenes": [
-    {
-      "id": "场景ID1",
-      "chapter_id": "章节ID",
-      "document_id": "文档ID",
-      "index": 0,
-      "content": "场景描述内容",
-      "image_url": "https://example.com/image.jpg",
-      "voice_url": "https://example.com/voice.mp3",
-      "created_at": "2024-10-24 12:00:00",
-      "updated_at": "2024-10-24 12:00:00"
-    }
-  ]
+  "code": 200,
+  "message": "",
+  "reqid": "abc123-def456-ghi789",
+  "data": {
+    "scenes": [
+      {
+        "id": "场景ID1",
+        "chapter_id": "章节ID",
+        "document_id": "文档ID",
+        "index": 0,
+        "content": "场景描述内容",
+        "image_url": "https://example.com/image.jpg",
+        "voice_url": "https://example.com/voice.mp3",
+        "created_at": "2024-10-24 12:00:00",
+        "updated_at": "2024-10-24 12:00:00"
+      }
+    ]
+  }
 }
 ```
 
-**状态码**
+**业务状态码**
 
 - `200`: 获取成功
 - `400`: 参数无效
@@ -616,15 +718,27 @@ GET /v1/chapters/:chapter_id/scenes
 
 ---
 
-## 错误码
+## 业务状态码
 
-| 错误码 | 说明 |
+系统使用业务状态码（响应 body 中的 `code` 字段）来表示具体的业务处理结果：
+
+| 状态码 | 说明 |
 |--------|------|
+| 200 | 业务处理成功 |
 | 400 | 请求参数错误 |
 | 401 | 未授权 (当前未启用) |
 | 403 | 禁止访问 (当前未启用) |
 | 500 | 服务器内部错误 |
+| 599 | 服务器内部错误 (默认错误码) |
 | 612 | 文档不存在 |
 | 614 | 文档已存在 |
+
+**注意**
+
+- HTTP 状态码始终为 200（表示请求被服务器接受）
+- 业务处理是否成功通过响应 body 中的 `code` 字段判断
+- `code` 为 200 表示业务成功，非 200 表示业务失败
+- 失败时 `message` 字段包含详细错误信息
+- 每个响应都包含 `reqid` 字段，用于请求追踪和日志关联
 
 ---
