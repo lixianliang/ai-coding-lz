@@ -82,10 +82,11 @@ type Role struct {
 
 // ===== Document DAO =====
 
-func (db *Database) CreateDocument(ctx context.Context, docID string, args *api.CreateDocumentArgs) (*Document, error) {
+func (db *Database) CreateDocument(ctx context.Context, docID, fileID string, args *api.CreateDocumentArgs) (*Document, error) {
 	now := time.Now()
 	doc := Document{
 		ID:        docID,
+		FileID:    fileID,
 		Name:      args.Name,
 		Status:    DocumentStatusChapterReady,
 		CreatedAt: now,

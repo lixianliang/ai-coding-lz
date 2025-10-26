@@ -12,7 +12,7 @@ type IDataBase interface {
 	GetAdminID(ctx context.Context) (int64, error)
 
 	// Document
-	CreateDocument(ctx context.Context, docID string, args *api.CreateDocumentArgs) (*Document, error)
+	CreateDocument(ctx context.Context, docID, fileID string, args *api.CreateDocumentArgs) (*Document, error)
 	GetDocument(ctx context.Context, id string) (Document, error)
 	GetDocumentWithName(ctx context.Context, name string) (Document, error)
 	UpdateDocument(ctx context.Context, id string, args *api.UpdateDocumentArgs) error

@@ -19,6 +19,7 @@ import (
 	"gorm.io/gorm"
 
 	"imgagent/api"
+	"imgagent/bailian"
 	"imgagent/db"
 	"imgagent/pkg/logger"
 	"imgagent/proto"
@@ -48,6 +49,20 @@ func setupTestService(t *testing.T) (*Service, func()) {
 	database := &db.Database{}
 	database.SetDB(gormDB)
 
+	// 创建 bailian 客户端（如果环境变量设置了 API key）
+	var bailianClient *bailian.Client
+	if apiKey := os.Getenv("BAILIAN_API_KEY"); apiKey != "" {
+		bailianConfig := bailian.Config{
+			BaseURL:        "https://dashscope.aliyuncs.com",
+			APIKey:         apiKey,
+			RequestTimeout: 30,
+			MaxRetries:     3,
+		}
+		var err error
+		bailianClient, err = bailian.NewClient(bailianConfig)
+		require.NoError(t, err)
+	}
+
 	// 创建测试 service
 	service := &Service{
 		conf: Config{
@@ -55,7 +70,8 @@ func setupTestService(t *testing.T) (*Service, func()) {
 			Temp:       tempDir,
 			Storage:    storage.Config{},
 		},
-		db: database,
+		db:            database,
+		bailianClient: bailianClient,
 	}
 
 	// 返回清理函数
@@ -71,6 +87,12 @@ func setupTestService(t *testing.T) (*Service, func()) {
 }
 
 func TestDocumentCRUD(t *testing.T) {
+	// 注意：此测试需要真实的 Bailian API key，设置环境变量 BAILIAN_API_KEY 来指定
+	if os.Getenv("BAILIAN_API_KEY") == "" {
+		t.Skip("跳过测试：需要设置环境变量 BAILIAN_API_KEY")
+		return
+	}
+
 	service, cleanup := setupTestService(t)
 	defer cleanup()
 
@@ -134,7 +156,7 @@ func TestDocumentCRUD(t *testing.T) {
 
 		assert.NotEmpty(t, doc.ID)
 		assert.Equal(t, "骆驼祥子", doc.Name)
-		assert.Equal(t, "inited", doc.Status)
+		assert.Equal(t, "chapterReady", doc.Status)
 		assert.NotEmpty(t, doc.CreatedAt)
 		assert.NotEmpty(t, doc.UpdatedAt)
 
@@ -460,7 +482,13 @@ func TestErrorCases(t *testing.T) {
 }
 
 // TestCreateDocumentWithSampleFile 使用小文件测试创建文档
+// 注意：此测试需要真实的 Bailian API key，设置环境变量 BAILIAN_API_KEY 来指定
 func TestCreateDocumentWithSampleFile(t *testing.T) {
+	// 检查是否有真实的 Bailian API key
+	if os.Getenv("BAILIAN_API_KEY") == "" {
+		t.Skip("跳过测试：需要设置环境变量 BAILIAN_API_KEY")
+		return
+	}
 	service, cleanup := setupTestService(t)
 	defer cleanup()
 
@@ -519,4 +547,3 @@ func TestCreateDocumentWithSampleFile(t *testing.T) {
 	assert.Equal(t, "测试文档", doc.Name)
 	zap.S().Infof("使用临时文件创建文档成功，ID: %s", doc.ID)
 }
-

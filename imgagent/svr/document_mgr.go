@@ -3,7 +3,6 @@ package svr
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"imgagent/bailian"
@@ -109,44 +108,6 @@ func (m *DocumentMgr) HandleDocumentScenceTasks(ctx context.Context) {
 func (m *DocumentMgr) HandleDocumentScence(ctx context.Context, doc db.Document) error {
 	log := logger.FromContext(ctx)
 	log.Infof("Handling document scene extraction, docID: %s", doc.ID)
-
-	// 1. 如果 FileID 为空，上传文件到阿里云百炼
-	if doc.FileID == "" {
-		// 从 temp 目录找到对应文件
-		// 尝试常见的文件扩展名
-		var filename string
-		exts := []string{".txt", ".pdf", ".doc", ".docx", ".md"}
-		for _, ext := range exts {
-			tryFilename := fmt.Sprintf("./temp/%s%s", doc.ID, ext)
-			if _, err := os.Stat(tryFilename); err == nil {
-				filename = tryFilename
-				break
-			}
-		}
-
-		if filename == "" {
-			log.Errorf("File not found for doc: %s", doc.ID)
-			return fmt.Errorf("file not found for doc: %s", doc.ID)
-		}
-
-		log.Infof("Uploading file to Bailian, filename: %s", filename)
-
-		fileID, err := m.bailianClient.UploadFile(ctx, filename)
-		if err != nil {
-			log.Errorf("Failed to upload file, doc: %s, err: %v", doc.ID, err)
-			return err
-		}
-
-		// 更新 FileID
-		err = m.db.UpdateDocumentFileID(ctx, doc.ID, fileID)
-		if err != nil {
-			log.Errorf("Failed to update fileID, doc: %s, err: %v", doc.ID, err)
-			return err
-		}
-
-		doc.FileID = fileID
-		log.Infof("File uploaded successfully, docID: %s, fileID: %s", doc.ID, fileID)
-	}
 
 	// 2. 提取角色信息（如果文档已经有角色则不重复提取）
 	existingRoles, err := m.db.ListRolesByDocument(ctx, doc.ID)

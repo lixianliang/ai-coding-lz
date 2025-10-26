@@ -37,12 +37,12 @@ func TestCreateDocument(t *testing.T) {
 		Name: "测试文档",
 	}
 
-	doc, err := db.CreateDocument(ctx, docID, "file-id-test", args)
+	doc, err := db.CreateDocument(ctx, docID, "file-id-123", args)
 	require.NoError(t, err)
 	assert.Equal(t, docID, doc.ID)
 	assert.Equal(t, "测试文档", doc.Name)
 	assert.Equal(t, DocumentStatusChapterReady, doc.Status)
-	assert.Equal(t, "file-id-test", doc.FileID)
+	assert.Equal(t, "file-id-123", doc.FileID)
 
 	// 验证可以查询
 	found, err := db.GetDocument(ctx, docID)
@@ -169,9 +169,9 @@ func TestListChapterReadyDocuments(t *testing.T) {
 	doc2 := MakeUUID()
 	doc3 := MakeUUID()
 
-	db.CreateDocument(ctx, doc1, "file-id-1", &api.CreateDocumentArgs{Name: "doc1"})
-	db.CreateDocument(ctx, doc2, "file-id-2", &api.CreateDocumentArgs{Name: "doc2"})
-	db.CreateDocument(ctx, doc3, "file-id-3", &api.CreateDocumentArgs{Name: "doc3"})
+	db.CreateDocument(ctx, doc1, &api.CreateDocumentArgs{Name: "doc1"})
+	db.CreateDocument(ctx, doc2, &api.CreateDocumentArgs{Name: "doc2"})
+	db.CreateDocument(ctx, doc3, &api.CreateDocumentArgs{Name: "doc3"})
 
 	// 更新 doc2 状态为 sceneReady
 	db.UpdateDocumentStatus(ctx, doc2, DocumentStatusSceneReady)
@@ -278,7 +278,7 @@ func TestUpdateDocumentFileID(t *testing.T) {
 	// 创建文档
 	docID := MakeUUID()
 	args := &api.CreateDocumentArgs{Name: "测试文档"}
-	_, err := db.CreateDocument(ctx, docID, "file-id-init", args)
+	_, err := db.CreateDocument(ctx, docID, args)
 	require.NoError(t, err)
 
 	// 更新 FileID
@@ -301,9 +301,9 @@ func TestListSceneReadyDocuments(t *testing.T) {
 	doc2 := MakeUUID()
 	doc3 := MakeUUID()
 
-	db.CreateDocument(ctx, doc1, "file-id-1", &api.CreateDocumentArgs{Name: "doc1"})
-	db.CreateDocument(ctx, doc2, "file-id-2", &api.CreateDocumentArgs{Name: "doc2"})
-	db.CreateDocument(ctx, doc3, "file-id-3", &api.CreateDocumentArgs{Name: "doc3"})
+	db.CreateDocument(ctx, doc1, &api.CreateDocumentArgs{Name: "doc1"})
+	db.CreateDocument(ctx, doc2, &api.CreateDocumentArgs{Name: "doc2"})
+	db.CreateDocument(ctx, doc3, &api.CreateDocumentArgs{Name: "doc3"})
 
 	// 设置状态
 	db.UpdateDocumentStatus(ctx, doc1, DocumentStatusChapterReady)
@@ -373,7 +373,7 @@ func TestFullFlow(t *testing.T) {
 	// 1. 创建文档
 	docID := MakeUUID()
 	args := &api.CreateDocumentArgs{Name: "完整流程测试"}
-	doc, err := db.CreateDocument(ctx, docID, "file-id-full", args)
+	doc, err := db.CreateDocument(ctx, docID, args)
 	require.NoError(t, err)
 	assert.Equal(t, DocumentStatusChapterReady, doc.Status)
 
