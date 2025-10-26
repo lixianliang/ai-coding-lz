@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { Document, Chapter, Role, Scene } from '@/apis/types'
+import { Document, Chapter, Role, Scene, UpdateRoleRequest, UpdateSceneRequest } from '@/apis/types'
 import * as api from '@/apis/modules/document'
 
 export const useDocumentStore = defineStore('document', () => {
@@ -94,6 +94,26 @@ export const useDocumentStore = defineStore('document', () => {
     }, 5000) // 5秒轮询一次
   }
 
+  // 更新角色
+  async function updateRole(roleId: string, data: UpdateRoleRequest) {
+    const res = await api.updateRole(roleId, data)
+    // 更新成功后刷新角色列表
+    if (currentDocument.value) {
+      await fetchRoles(currentDocument.value.id)
+    }
+    return res.data
+  }
+
+  // 更新场景
+  async function updateScene(sceneId: string, data: UpdateSceneRequest) {
+    const res = await api.updateScene(sceneId, data)
+    // 更新成功后刷新场景列表
+    if (currentDocument.value) {
+      await fetchDocumentScenes(currentDocument.value.id)
+    }
+    return res.data
+  }
+
   return {
     documents,
     currentDocument,
@@ -111,6 +131,8 @@ export const useDocumentStore = defineStore('document', () => {
     fetchChapterScenes,
     createDocument,
     deleteDocument,
-    pollDocumentStatus
+    pollDocumentStatus,
+    updateRole,
+    updateScene
   }
 })

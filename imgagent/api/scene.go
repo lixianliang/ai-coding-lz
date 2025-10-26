@@ -34,3 +34,16 @@ type ListRolesResult struct {
 type ListScenesResult struct {
 	Scenes []Scene `json:"scenes"`
 }
+
+// UpdateRoleArgs 更新角色请求参数
+type UpdateRoleArgs struct {
+	Name       string `json:"name" binding:"required"`
+	Gender     string `json:"gender" binding:"required"`
+	Character  string `json:"character" binding:"required"`
+	Appearance string `json:"appearance" binding:"required"`
+}
+
+// UpdateSceneArgs 更新场景请求参数
+type UpdateSceneArgs struct {
+	Content string `json:"content" binding:"required"`
+}

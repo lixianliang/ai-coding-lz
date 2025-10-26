@@ -36,8 +36,13 @@
                 <span class="scene-icon">🎬</span>
                 <span class="scene-index">场景 {{ scene.index }}</span>
               </div>
-              <el-tag size="small" v-if="scene.image_url" effect="dark">已完成</el-tag>
-              <el-tag size="small" type="info" effect="dark" v-else>处理中</el-tag>
+              <div class="scene-actions">
+                <el-tag size="small" v-if="scene.image_url" effect="dark">已完成</el-tag>
+                <el-tag size="small" type="info" effect="dark" v-else>处理中</el-tag>
+                <el-button type="primary" size="small" :icon="Edit" @click="handleEditScene(scene)">
+                  编辑
+                </el-button>
+              </div>
             </div>
             
             <div class="scene-content">
@@ -70,15 +75,40 @@
         </div>
       </el-main>
     </el-container>
+
+    <!-- 编辑场景对话框 -->
+    <el-dialog v-model="showEditSceneDialog" title="编辑场景" width="700px">
+      <el-form :model="sceneForm" label-width="80px" :rules="sceneRules" ref="sceneFormRef">
+        <el-form-item label="场景内容" prop="content">
+          <el-input 
+            v-model="sceneForm.content" 
+            type="textarea" 
+            :rows="8" 
+            placeholder="请输入场景描述"
+          />
+        </el-form-item>
+        <el-alert
+          title="提示：修改场景内容后，将立即重新生成图片和语音（可能需要几秒钟）"
+          type="info"
+          :closable="false"
+          show-icon
+        />
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditSceneDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveScene" :loading="submitting">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Loading, VideoPlay, VideoPause } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ArrowLeft, Loading, VideoPlay, VideoPause, Edit } from '@element-plus/icons-vue'
+import { ElMessage, FormInstance, FormRules } from 'element-plus'
 import { useDocumentStore } from '@/stores/document'
+import { Scene, UpdateSceneRequest } from '@/apis/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -87,6 +117,18 @@ const store = useDocumentStore()
 const loading = ref(false)
 const playingSceneId = ref<string | null>(null)
 const audioRefs = ref<Map<string, HTMLAudioElement>>(new Map())
+const showEditSceneDialog = ref(false)
+const submitting = ref(false)
+const sceneFormRef = ref<FormInstance>()
+const currentEditingSceneId = ref('')
+
+const sceneForm = ref<UpdateSceneRequest>({
+  content: ''
+})
+
+const sceneRules: FormRules = {
+  content: [{ required: true, message: '请输入场景内容', trigger: 'blur' }]
+}
 
 // 轮询定时器
 let pollInterval: NodeJS.Timeout | null = null
@@ -184,6 +226,42 @@ const stopPolling = () => {
     clearInterval(pollInterval)
     pollInterval = null
   }
+}
+
+// 编辑场景
+const handleEditScene = (scene: Scene) => {
+  currentEditingSceneId.value = scene.id
+  sceneForm.value = {
+    content: scene.content
+  }
+  showEditSceneDialog.value = true
+}
+
+// 保存场景
+const handleSaveScene = async () => {
+  if (!sceneFormRef.value) return
+  
+  await sceneFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    
+    submitting.value = true
+    try {
+      await store.updateScene(currentEditingSceneId.value, sceneForm.value)
+      ElMessage.success('场景更新成功，图片和语音已重新生成')
+      showEditSceneDialog.value = false
+      
+      // 刷新场景列表以获取最新的图片和语音 URL
+      const docId = store.currentDocument?.id
+      if (docId) {
+        await store.fetchDocumentScenes(docId)
+      }
+    } catch (error) {
+      console.error('更新场景失败:', error)
+      ElMessage.error('场景更新失败')
+    } finally {
+      submitting.value = false
+    }
+  })
 }
 
 onMounted(async () => {
@@ -349,6 +427,12 @@ onUnmounted(() => {
           font-size: 20px;
           color: #333;
         }
+      }
+      
+      .scene-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
       }
     }
   

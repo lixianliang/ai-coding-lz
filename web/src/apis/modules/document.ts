@@ -1,5 +1,5 @@
 import request from '../request'
-import type { BaseResponse, Document, Chapter, CreateDocumentRequest, Role, Scene } from '../types'
+import type { BaseResponse, Document, Chapter, CreateDocumentRequest, Role, Scene, UpdateRoleRequest, UpdateSceneRequest } from '../types'
 
 // 文档列表响应结构
 interface DocumentsResponse {
@@ -79,4 +79,14 @@ export function getDocumentScenes(documentId: string) {
 // 章节场景列表
 export function getChapterScenes(chapterId: string) {
   return request.get(`/chapters/${chapterId}/scenes`) as Promise<BaseResponse<ScenesResponse>>
+}
+
+// 更新角色
+export function updateRole(roleId: string, data: UpdateRoleRequest) {
+  return request.put(`/roles/${roleId}`, data) as Promise<BaseResponse<Role>>
+}
+
+// 更新场景
+export function updateScene(sceneId: string, data: UpdateSceneRequest) {
+  return request.put(`/scenes/${sceneId}`, data) as Promise<BaseResponse<Scene>>
 }

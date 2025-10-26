@@ -58,3 +58,16 @@ export interface CreateDocumentRequest {
   name: string
   file: File
 }
+
+// 更新角色请求
+export interface UpdateRoleRequest {
+  name: string
+  gender: string
+  character: string
+  appearance: string
+}
+
+// 更新场景请求
+export interface UpdateSceneRequest {
+  content: string
+}

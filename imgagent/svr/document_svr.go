@@ -18,6 +18,7 @@ import (
 	"gorm.io/gorm"
 
 	"imgagent/api"
+	"imgagent/bailian"
 	"imgagent/db"
 	hutil "imgagent/httputil"
 	"imgagent/pkg/logger"
@@ -533,4 +534,160 @@ func makeScene(s *db.Scene) api.Scene {
 		CreatedAt:  s.CreatedAt.Format(time.DateTime),
 		UpdatedAt:  s.UpdatedAt.Format(time.DateTime),
 	}
+}
+
+// HandleUpdateRole 更新角色信息
+func (s *Service) HandleUpdateRole(c *gin.Context) {
+	ctx := c.Request.Context()
+	log := logger.FromGinContext(c)
+
+	roleID := c.Param("id")
+	if roleID == "" {
+		hutil.AbortError(c, http.StatusBadRequest, "invalid role id")
+		return
+	}
+
+	var args api.UpdateRoleArgs
+	if err := c.ShouldBindJSON(&args); err != nil {
+		log.Errorf("Invalid request body, err: %v", err)
+		hutil.AbortError(c, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	log.Infof("Update role, roleID: %s", roleID)
+	err := s.db.UpdateRole(ctx, roleID, &args)
+	if err != nil {
+		log.Errorf("Failed to update role, err: %v", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			hutil.AbortError(c, http.StatusNotFound, "role not found")
+		} else {
+			hutil.AbortError(c, http.StatusInternalServerError, "update role failed")
+		}
+		return
+	}
+
+	role, err := s.db.GetRole(ctx, roleID)
+	if err != nil {
+		log.Errorf("Failed to get role, err: %v", err)
+		hutil.AbortError(c, http.StatusInternalServerError, "get role failed")
+		return
+	}
+
+	hutil.WriteData(c, makeRole(&role))
+}
+
+// HandleUpdateScene 更新场景内容，立即重新生成图片和语音
+func (s *Service) HandleUpdateScene(c *gin.Context) {
+	ctx := c.Request.Context()
+	log := logger.FromGinContext(c)
+
+	sceneID := c.Param("id")
+	if sceneID == "" {
+		hutil.AbortError(c, http.StatusBadRequest, "invalid scene id")
+		return
+	}
+
+	var args api.UpdateSceneArgs
+	if err := c.ShouldBindJSON(&args); err != nil {
+		log.Errorf("Invalid request body, err: %v", err)
+		hutil.AbortError(c, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// 1. 获取场景信息
+	scene, err := s.db.GetScene(ctx, sceneID)
+	if err != nil {
+		log.Errorf("Failed to get scene, err: %v", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			hutil.AbortError(c, http.StatusNotFound, "scene not found")
+		} else {
+			hutil.AbortError(c, http.StatusInternalServerError, "get scene failed")
+		}
+		return
+	}
+
+	// 2. 更新场景内容
+	log.Infof("Update scene content, sceneID: %s", sceneID)
+	err = s.db.UpdateScene(ctx, sceneID, &args)
+	if err != nil {
+		log.Errorf("Failed to update scene, err: %v", err)
+		hutil.AbortError(c, http.StatusInternalServerError, "update scene failed")
+		return
+	}
+
+	// 3. 获取文档信息（需要摘要和角色信息）
+	doc, err := s.db.GetDocument(ctx, scene.DocumentID)
+	if err != nil {
+		log.Errorf("Failed to get document, err: %v", err)
+		hutil.AbortError(c, http.StatusInternalServerError, "get document failed")
+		return
+	}
+
+	// 4. 获取角色信息
+	dbRoles, err := s.db.ListRolesByDocument(ctx, doc.ID)
+	if err != nil {
+		log.Errorf("Failed to list roles, err: %v", err)
+		hutil.AbortError(c, http.StatusInternalServerError, "list roles failed")
+		return
+	}
+
+	// 转换为 bailian.RoleInfo
+	roles := make([]bailian.RoleInfo, 0, len(dbRoles))
+	for _, r := range dbRoles {
+		roles = append(roles, bailian.RoleInfo{
+			Name:       r.Name,
+			Gender:     r.Gender,
+			Character:  r.Character,
+			Appearance: r.Appearance,
+		})
+	}
+
+	// 5. 生成图片
+	log.Infof("Generating image for scene, sceneID: %s", sceneID)
+	imageURL, err := s.bailianClient.GenerateImage(ctx, args.Content, doc.Summary, roles)
+	if err != nil {
+		log.Errorf("Failed to generate image, scene: %s, err: %v", sceneID, err)
+		hutil.AbortError(c, http.StatusInternalServerError, "generate image failed")
+		return
+	}
+
+	// 更新图片 URL
+	err = s.db.UpdateSceneImageURL(ctx, sceneID, imageURL)
+	if err != nil {
+		log.Errorf("Failed to update scene imageURL, err: %v", err)
+		hutil.AbortError(c, http.StatusInternalServerError, "update image failed")
+		return
+	}
+
+	log.Infof("Image generated for scene: %s, URL: %s", sceneID, imageURL)
+
+	// 6. 生成语音
+	log.Infof("Generating TTS for scene, sceneID: %s", sceneID)
+	voiceURL, err := s.bailianClient.GenerateTTS(ctx, args.Content)
+	if err != nil {
+		log.Errorf("Failed to generate TTS, scene: %s, err: %v", sceneID, err)
+		hutil.AbortError(c, http.StatusInternalServerError, "generate voice failed")
+		return
+	}
+
+	// 更新语音 URL
+	err = s.db.UpdateSceneVoiceURL(ctx, sceneID, voiceURL)
+	if err != nil {
+		log.Errorf("Failed to update scene voiceURL, err: %v", err)
+		hutil.AbortError(c, http.StatusInternalServerError, "update voice failed")
+		return
+	}
+
+	log.Infof("Voice generated for scene: %s, URL: %s", sceneID, voiceURL)
+
+	// 7. 返回更新后的场景
+	scene, err = s.db.GetScene(ctx, sceneID)
+	if err != nil {
+		log.Errorf("Failed to get scene, err: %v", err)
+		hutil.AbortError(c, http.StatusInternalServerError, "get scene failed")
+		return
+	}
+
+	log.Infof("Scene updated and regenerated, sceneID: %s", sceneID)
+	hutil.WriteData(c, makeScene(&scene))
 }
