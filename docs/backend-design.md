@@ -185,9 +185,11 @@ UpdateChapterSceneIDs(ctx, chapterID, sceneIDs) error  // 更新场景ID列表
 CreateScenes(ctx, scenes []Scene) error
 GetScene(ctx, id) (Scene, error)
 ListScenesByChapter(ctx, chapterID) ([]Scene, error)
-ListScenesByDocument(ctx, documentID) ([]Scene, error)
+ListScenesByDocument(ctx, documentID) ([]Scene, error)  // 按 chapter_id ASC, index ASC 排序
 ListPendingImageScenes(ctx, documentID) ([]Scene, error)  // 查询未生成图片的场景
+UpdateScene(ctx, id, args *api.UpdateSceneArgs) error  // 更新场景内容
 UpdateSceneImageURL(ctx, sceneID, imageURL) error
+UpdateSceneVoiceURL(ctx, sceneID, voiceURL) error  // 更新语音URL
 DeleteScenesByChapter(ctx, chapterID) error
 ```
 
@@ -197,6 +199,7 @@ DeleteScenesByChapter(ctx, chapterID) error
 CreateRoles(ctx, roles []Role) error
 GetRole(ctx, id) (Role, error)
 ListRolesByDocument(ctx, documentID) ([]Role, error)
+UpdateRole(ctx, id, args *api.UpdateRoleArgs) error  // 更新角色信息
 DeleteRolesByDocument(ctx, documentID) error
 ```
 
@@ -274,6 +277,19 @@ func NewClient(config Config) (*Client, error) {
 // 返回 fileID 用于后续 qwen-long 调用
 func (c *Client) UploadFile(ctx context.Context, filename string) (string, error)
 ```
+
+#### 2.4.1a TTS 语音生成
+
+```go
+// GenerateTTS 根据文本生成语音
+// 返回音频 URL
+func (c *Client) GenerateTTS(ctx context.Context, text string) (string, error)
+```
+
+**实现要点：**
+- 调用阿里云百炼 TTS API
+- 返回生成的音频文件 URL
+- 用于为场景内容生成语音朗读
 
 **实现要点：**
 - URL: `POST /compatible-mode/v1/files`
@@ -410,8 +426,9 @@ func (c *Client) GenerateScenes(ctx context.Context, chapterContent string) ([]s
 
 ```go
 // GenerateImage 根据场景描述生成图片
+// 使用文档摘要和角色信息作为上下文
 // 返回图片 URL
-func (c *Client) GenerateImage(ctx context.Context, sceneContent string) (string, error)
+func (c *Client) GenerateImage(ctx context.Context, sceneContent, summary string, roles []RoleInfo) (string, error)
 ```
 
 **实现要点：**
@@ -922,6 +939,27 @@ GET /v1/documents/{document_id}/roles
 {
     "code": 200,
     "data": {
+        "roles": [...]
+    }
+}
+```
+
+---
+
+#### PUT /v1/roles/:id
+
+更新角色信息。
+
+**请求：**
+```
+GET /v1/documents/{document_id}/roles
+```
+
+**响应：**
+```json
+{
+    "code": 200,
+    "data": {
         "roles": [
             {
                 "id": "xxx",
@@ -938,9 +976,16 @@ GET /v1/documents/{document_id}/roles
 }
 ```
 
-**错误码：**
-- 400: 文档ID无效
-- 612: 文档不存在
+**实现逻辑：**
+```go
+func (s *Service) HandleUpdateRole(c *gin.Context) {
+    // 1. 获取角色ID和请求参数
+    // 2. 更新角色信息
+    // 3. 返回更新后的角色
+}
+```
+
+---
 
 #### GET /v1/documents/:document_id/scenes
 
@@ -973,9 +1018,34 @@ GET /v1/documents/{document_id}/scenes
 }
 ```
 
-**错误码：**
-- 400: 文档ID无效
-- 612: 文档不存在
+**说明：**
+- 场景列表按 `chapter_id ASC, index ASC` 排序
+
+---
+
+#### PUT /v1/scenes/:id
+
+更新场景内容，并立即重新生成图片和语音。
+
+**实现逻辑：**
+```go
+func (s *Service) HandleUpdateScene(c *gin.Context) {
+    // 1. 获取场景信息
+    // 2. 更新场景内容
+    // 3. 获取文档信息（摘要）
+    // 4. 获取角色列表
+    // 5. 重新生成图片
+    // 6. 重新生成语音
+    // 7. 返回更新后的场景
+}
+```
+
+**关键点：**
+- 同步执行图片和语音生成，确保返回时已完成
+- 如果生成失败，需要返回错误
+- 使用文档摘要和角色信息作为上下文生成图片
+
+---
 
 #### GET /v1/chapters/:chapter_id/scenes
 
@@ -1017,7 +1087,7 @@ GET /v1/chapters/{chapter_id}/scenes
 
 ### 4.3 API 类型定义
 
-在 `imgagent/api/document.go` 中添加：
+在 `imgagent/api/scene.go` 中添加：
 
 ```go
 // Role 角色信息
@@ -1054,6 +1124,19 @@ type ListRolesResult struct {
 type ListScenesResult struct {
     Scenes []Scene `json:"scenes"`
 }
+
+// UpdateRoleArgs 更新角色请求参数
+type UpdateRoleArgs struct {
+    Name       string `json:"name" binding:"required"`
+    Gender     string `json:"gender" binding:"required"`
+    Character  string `json:"character" binding:"required"`
+    Appearance string `json:"appearance" binding:"required"`
+}
+
+// UpdateSceneArgs 更新场景请求参数
+type UpdateSceneArgs struct {
+    Content string `json:"content" binding:"required"`
+}
 ```
 
 ### 4.4 路由注册
@@ -1063,10 +1146,12 @@ type ListScenesResult struct {
 ```go
 // Role
 authGroup.GET("/documents/:document_id/roles", s.HandleGetRoles)
+authGroup.PUT("/roles/:id", s.HandleUpdateRole)
 
 // Scene
 authGroup.GET("/documents/:document_id/scenes", s.HandleListScenesByDocument)
 authGroup.GET("/chapters/:chapter_id/scenes", s.HandleListScenesByChapter)
+authGroup.PUT("/scenes/:id", s.HandleUpdateScene)
 ```
 
 ## 五、配置文件设计
