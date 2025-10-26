@@ -22,7 +22,8 @@ type Document struct {
 - `Name`: 文档名称，唯一索引，最大128字符
 - `FileID`: 阿里云百炼返回的文件ID，用于后续调用 qwen-long
 - `Status`: 文档状态，取值：
-  - `chapterReady`: 章节分割完成，等待场景提取
+  - `chapterReady`: 章节分割完成，等待角色提取
+  - `roleReady`: 角色提取完成，等待场景提取
   - `sceneReady`: 场景提取完成，等待图片生成
   - `imgReady`: 图片生成完成
 - `CreatedAt`: 创建时间
@@ -757,15 +758,21 @@ func (m *DocumentMgr) HandleDocumentImageGen(ctx context.Context, doc db.Documen
     ↓
 [chapterReady]  ← 章节分割完成
     ↓
-    ↓ (Worker 1 处理)
-    ↓ - 上传文件到百炼
+    ↓ (Worker 1: 角色提取)
     ↓ - 提取角色信息
+    ↓ - 保存到数据库
+    ↓
+[roleReady]  ← 角色提取完成
+    ↓
+    ↓ (Worker 2: 场景生成)
     ↓ - 为每章节生成场景
+    ↓ - 保存场景到数据库
     ↓
 [sceneReady]  ← 场景提取完成
     ↓
-    ↓ (Worker 2 处理)
+    ↓ (Worker 3: 图片生成)
     ↓ - 为每个场景生成图片
+    ↓ - 更新场景图片URL
     ↓
 [imgReady]  ← 图片生成完成（最终状态）
 ```

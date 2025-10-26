@@ -11,7 +11,7 @@ export interface Document {
   id: string
   name: string
   file_id: string
-  status: 'chapterReady' | 'sceneReady' | 'imgReady'
+  status: 'chapterReady' | 'roleReady' | 'sceneReady' | 'imgReady'
   created_at: string
   updated_at: string
 }

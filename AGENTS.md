@@ -11,7 +11,7 @@
 ## 前端 web
 ``` shell
 cd web
-npm run serve
+npm run dev
 ```
 
 ## 后端 imgagent

@@ -21,6 +21,7 @@ type IDataBase interface {
 	DeleteDocument(ctx context.Context, id string) error
 	ListDocuments(ctx context.Context) ([]Document, error)
 	ListChapterReadyDocuments(ctx context.Context) ([]Document, error)
+	ListRoleReadyDocuments(ctx context.Context) ([]Document, error)
 	ListSceneReadyDocuments(ctx context.Context) ([]Document, error)
 
 	// Chapter

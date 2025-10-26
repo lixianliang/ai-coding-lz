@@ -12,6 +12,32 @@
       </el-header>
       
       <el-main>
+        <!-- 状态提示 -->
+        <el-alert 
+          v-if="store.currentDocument?.status === 'chapterReady'"
+          title="正在提取角色信息..."
+          type="info"
+          :closable="false"
+          show-icon
+          class="status-alert"
+        />
+        <el-alert 
+          v-else-if="store.currentDocument?.status === 'roleReady'"
+          title="角色提取完成，正在生成场景..."
+          type="success"
+          :closable="false"
+          show-icon
+          class="status-alert"
+        />
+        <el-alert 
+          v-else-if="store.currentDocument?.status === 'sceneReady'"
+          title="场景生成完成，正在生成图片..."
+          type="warning"
+          :closable="false"
+          show-icon
+          class="status-alert"
+        />
+
         <el-tabs v-model="activeTab">
           <el-tab-pane label="章节列表" name="chapters">
             <el-table :data="store.chapters" v-loading="loading" stripe>
@@ -33,7 +59,7 @@
             </el-table>
           </el-tab-pane>
           
-          <el-tab-pane label="角色列表" name="roles">
+          <el-tab-pane label="角色列表" name="roles" :disabled="!showRoles">
             <el-table :data="store.roles" v-loading="loading" stripe>
               <el-table-column prop="name" label="名字" width="120" />
               <el-table-column prop="gender" label="性别" width="100" />
@@ -48,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { useDocumentStore } from '@/stores/document'
@@ -59,6 +85,12 @@ const store = useDocumentStore()
 
 const loading = ref(false)
 const activeTab = ref('chapters')
+
+// 计算属性：是否显示角色
+const showRoles = computed(() => {
+  const status = store.currentDocument?.status
+  return status === 'roleReady' || status === 'sceneReady' || status === 'imgReady'
+})
 
 const handleViewScenes = (chapter: any) => {
   // 导航到章节场景页面
@@ -93,6 +125,10 @@ onMounted(async () => {
     h2 {
       margin: 0;
     }
+  }
+
+  .status-alert {
+    margin-bottom: 20px;
   }
 }
 </style>

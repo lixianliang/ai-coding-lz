@@ -292,6 +292,34 @@ func TestUpdateDocumentFileID(t *testing.T) {
 	assert.Equal(t, fileID, doc.FileID)
 }
 
+func TestListRoleReadyDocuments(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	// 创建不同状态的文档
+	doc1 := MakeUUID()
+	doc2 := MakeUUID()
+	doc3 := MakeUUID()
+	doc4 := MakeUUID()
+
+	db.CreateDocument(ctx, doc1, "file-id-1", &api.CreateDocumentArgs{Name: "doc1"})
+	db.CreateDocument(ctx, doc2, "file-id-2", &api.CreateDocumentArgs{Name: "doc2"})
+	db.CreateDocument(ctx, doc3, "file-id-3", &api.CreateDocumentArgs{Name: "doc3"})
+	db.CreateDocument(ctx, doc4, "file-id-4", &api.CreateDocumentArgs{Name: "doc4"})
+
+	// 设置状态
+	db.UpdateDocumentStatus(ctx, doc1, DocumentStatusChapterReady)
+	db.UpdateDocumentStatus(ctx, doc2, DocumentStatusRoleReady)
+	db.UpdateDocumentStatus(ctx, doc3, DocumentStatusSceneReady)
+	db.UpdateDocumentStatus(ctx, doc4, DocumentStatusImgReady)
+
+	// 查询 roleReady 的文档
+	docs, err := db.ListRoleReadyDocuments(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(docs))
+	assert.Equal(t, doc2, docs[0].ID)
+}
+
 func TestListSceneReadyDocuments(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()

@@ -18,6 +18,7 @@ type DocumentConfigEx struct {
 
 type DocumentConfig struct {
 	Enable                     bool `json:"enable"`
+	HandleRoleIntervalSecs     int  `json:"handle_role_interval_secs"`
 	HandleSceneIntervalSecs    int  `json:"handle_scene_interval_secs"`
 	HandleImageGenIntervalSecs int  `json:"handle_image_gen_interval_secs"`
 }
@@ -32,6 +33,9 @@ type DocumentMgr struct {
 
 func newDocumentMgr(confEx DocumentConfigEx, bailianClient *bailian.Client) (*DocumentMgr, error) {
 	// 设置默认值
+	if confEx.config.HandleRoleIntervalSecs == 0 {
+		confEx.config.HandleRoleIntervalSecs = 30
+	}
 	if confEx.config.HandleSceneIntervalSecs == 0 {
 		confEx.config.HandleSceneIntervalSecs = 30
 	}
@@ -48,8 +52,24 @@ func newDocumentMgr(confEx DocumentConfigEx, bailianClient *bailian.Client) (*Do
 }
 
 func (m *DocumentMgr) Run() {
+	go m.loopHandleDocumentRoleTasks()
 	go m.loopHandleDocumentScenceTasks()
 	go m.loopHandleImageGenTasks()
+}
+
+func (m *DocumentMgr) loopHandleDocumentRoleTasks() {
+	ticker := time.NewTicker(time.Second * time.Duration(m.config.HandleRoleIntervalSecs))
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			ctx := logger.NewContext(fmt.Sprintf("HandleDocumentRoleTasks-%d", time.Now().Unix()))
+			m.HandleDocumentRoleTasks(ctx)
+		case <-m.close:
+			return
+		}
+	}
 }
 
 func (m *DocumentMgr) loopHandleDocumentScenceTasks() {
@@ -82,12 +102,91 @@ func (m *DocumentMgr) loopHandleImageGenTasks() {
 	}
 }
 
-func (m *DocumentMgr) HandleDocumentScenceTasks(ctx context.Context) {
+func (m *DocumentMgr) HandleDocumentRoleTasks(ctx context.Context) {
 	log := logger.FromContext(ctx)
 
 	docs, err := m.db.ListChapterReadyDocuments(ctx)
 	if err != nil {
 		log.Errorf("Failed to list chapterReady documents, err: %v", err)
+		return
+	}
+
+	for _, doc := range docs {
+		err = m.HandleDocumentRole(ctx, doc)
+		if err != nil {
+			log.Errorf("Failed to handle document role, doc: %v, err: %v", doc, err)
+			continue
+		}
+		err = m.db.UpdateDocumentStatus(ctx, doc.ID, db.DocumentStatusRoleReady)
+		if err != nil {
+			log.Errorf("Failed to update document status, err: %v", err)
+			continue
+		}
+	}
+}
+
+func (m *DocumentMgr) HandleDocumentRole(ctx context.Context, doc db.Document) error {
+	log := logger.FromContext(ctx)
+	log.Infof("Handling document role extraction, docID: %s", doc.ID)
+
+	// 检查是否已有角色
+	existingRoles, err := m.db.ListRolesByDocument(ctx, doc.ID)
+	if err != nil {
+		log.Errorf("Failed to list existing roles, doc: %s, err: %v", doc.ID, err)
+		return err
+	}
+
+	if len(existingRoles) > 0 {
+		log.Infof("Roles already exist for doc: %s, count: %d", doc.ID, len(existingRoles))
+		return nil
+	}
+
+	// 提取角色
+	log.Infof("Extracting roles, docID: %s", doc.ID)
+	roles, err := m.bailianClient.ExtractRoles(ctx, doc.FileID)
+	if err != nil {
+		log.Errorf("Failed to extract roles, doc: %s, err: %v", doc.ID, err)
+		return err
+	}
+
+	// 角色不允许为空
+	if len(roles) == 0 {
+		log.Errorf("No roles extracted for doc: %s", doc.ID)
+		return fmt.Errorf("no roles extracted")
+	}
+
+	// 保存角色到数据库
+	dbRoles := make([]db.Role, 0, len(roles))
+	now := time.Now()
+	for _, r := range roles {
+		dbRoles = append(dbRoles, db.Role{
+			ID:         db.MakeUUID(),
+			DocumentID: doc.ID,
+			Name:       r.Name,
+			Gender:     r.Gender,
+			Character:  r.Character,
+			Appearance: r.Appearance,
+			CreatedAt:  now,
+			UpdatedAt:  now,
+		})
+	}
+
+	err = m.db.CreateRoles(ctx, dbRoles)
+	if err != nil {
+		log.Errorf("Failed to create roles, doc: %s, err: %v", doc.ID, err)
+		return err
+	}
+
+	log.Infof("Created %d roles for doc: %s", len(dbRoles), doc.ID)
+	return nil
+}
+
+func (m *DocumentMgr) HandleDocumentScenceTasks(ctx context.Context) {
+	log := logger.FromContext(ctx)
+
+	docs, err := m.db.ListRoleReadyDocuments(ctx)
+	if err != nil {
+		log.Errorf("Failed to list roleReady documents, err: %v", err)
 		return
 	}
 
@@ -109,50 +208,7 @@ func (m *DocumentMgr) HandleDocumentScence(ctx context.Context, doc db.Document)
 	log := logger.FromContext(ctx)
 	log.Infof("Handling document scene extraction, docID: %s", doc.ID)
 
-	// 2. 提取角色信息（如果文档已经有角色则不重复提取）
-	existingRoles, err := m.db.ListRolesByDocument(ctx, doc.ID)
-	if err != nil {
-		log.Errorf("Failed to list existing roles, doc: %s, err: %v", doc.ID, err)
-		return err
-	}
-
-	if len(existingRoles) == 0 {
-		log.Infof("No existing roles found, extracting roles, docID: %s", doc.ID)
-		roles, err := m.bailianClient.ExtractRoles(ctx, doc.FileID)
-		if err != nil {
-			log.Errorf("Failed to extract roles, doc: %s, err: %v", doc.ID, err)
-			return err
-		}
-
-		// 保存角色到数据库
-		if len(roles) > 0 {
-			dbRoles := make([]db.Role, 0, len(roles))
-			now := time.Now()
-			for _, r := range roles {
-				dbRoles = append(dbRoles, db.Role{
-					ID:         db.MakeUUID(),
-					DocumentID: doc.ID,
-					Name:       r.Name,
-					Gender:     r.Gender,
-					Character:  r.Character,
-					Appearance: r.Appearance,
-					CreatedAt:  now,
-					UpdatedAt:  now,
-				})
-			}
-
-			err = m.db.CreateRoles(ctx, dbRoles)
-			if err != nil {
-				log.Errorf("Failed to create roles, doc: %s, err: %v", doc.ID, err)
-				return err
-			}
-			log.Infof("Created %d roles for doc: %s", len(dbRoles), doc.ID)
-		}
-	} else {
-		log.Infof("Roles already exist for doc: %s, skipping extraction", doc.ID)
-	}
-
-	// 3. 获取所有章节
+	// 1. 获取所有章节
 	chapters, err := m.db.ListChapters(ctx, doc.ID)
 	if err != nil {
 		log.Errorf("Failed to list chapters, doc: %s, err: %v", doc.ID, err)
@@ -164,7 +220,7 @@ func (m *DocumentMgr) HandleDocumentScence(ctx context.Context, doc db.Document)
 		return nil
 	}
 
-	// 4. 为每个章节生成场景
+	// 2. 为每个章节生成场景
 	for _, chapter := range chapters {
 		log.Infof("Generating scenes for chapter, chapterID: %s, index: %d", chapter.ID, chapter.Index)
 

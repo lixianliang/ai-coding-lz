@@ -1,9 +1,26 @@
 import request from '../request'
-import type { BaseResponse, Document, Chapter, CreateDocumentRequest } from '../types'
+import type { BaseResponse, Document, Chapter, CreateDocumentRequest, Role, Scene } from '../types'
+
+// 文档列表响应结构
+interface DocumentsResponse {
+  documents: Document[]
+}
+
+interface ChaptersResponse {
+  chapters: Chapter[]
+}
+
+interface RolesResponse {
+  roles: Role[]
+}
+
+interface ScenesResponse {
+  scenes: Scene[]
+}
 
 // 文档列表
 export function getDocuments() {
-  return request.get('/documents') as Promise<BaseResponse<Document[]>>
+  return request.get('/documents') as Promise<BaseResponse<DocumentsResponse>>
 }
 
 // 创建文档
@@ -31,7 +48,7 @@ export function deleteDocument(id: string) {
 
 // 章节列表
 export function getChapters(documentId: string) {
-  return request.get(`/documents/${documentId}/chapters`) as Promise<BaseResponse<Chapter[]>>
+  return request.get(`/documents/${documentId}/chapters`) as Promise<BaseResponse<ChaptersResponse>>
 }
 
 // 章节详情
@@ -51,15 +68,15 @@ export function deleteChapter(id: string) {
 
 // 角色列表
 export function getRoles(documentId: string) {
-  return request.get(`/documents/${documentId}/roles`) as Promise<BaseResponse<any[]>>
+  return request.get(`/documents/${documentId}/roles`) as Promise<BaseResponse<RolesResponse>>
 }
 
 // 文档场景列表
 export function getDocumentScenes(documentId: string) {
-  return request.get(`/documents/${documentId}/scenes`) as Promise<BaseResponse<any[]>>
+  return request.get(`/documents/${documentId}/scenes`) as Promise<BaseResponse<ScenesResponse>>
 }
 
 // 章节场景列表
 export function getChapterScenes(chapterId: string) {
-  return request.get(`/chapters/${chapterId}/scenes`) as Promise<BaseResponse<any[]>>
+  return request.get(`/chapters/${chapterId}/scenes`) as Promise<BaseResponse<ScenesResponse>>
 }

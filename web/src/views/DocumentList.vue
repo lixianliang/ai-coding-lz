@@ -14,11 +14,13 @@
       <el-main>
         <el-table :data="store.documents" v-loading="loading" stripe>
           <el-table-column prop="name" label="文档名称" width="300" />
-          <el-table-column prop="status" label="状态" width="150">
+          <el-table-column prop="status" label="状态" width="180">
             <template #default="{ row }">
               <el-tag v-if="row.status === 'chapterReady'" type="info">章节就绪</el-tag>
-              <el-tag v-else-if="row.status === 'sceneReady'" type="warning">场景就绪</el-tag>
-              <el-tag v-else-if="row.status === 'imgReady'" type="success">图片就绪</el-tag>
+              <el-tag v-else-if="row.status === 'roleReady'" type="success">角色提取完成</el-tag>
+              <el-tag v-else-if="row.status === 'sceneReady'" type="warning">场景生成完成</el-tag>
+              <el-tag v-else-if="row.status === 'imgReady'" type="success">图片生成完成</el-tag>
+              <el-tag v-else type="info">{{ row.status }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column prop="created_at" label="创建时间" width="200" />
