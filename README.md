@@ -28,7 +28,8 @@
 5.浏览器里访问 "<http://localhost:3000>"  就可以了
 
 
-
+# 架构设计文档
+ 参考： docs/架构设计文档.md
 
 # DEMO视频
 https://www.bilibili.com/video/BV1sYszzhEPF/ 
