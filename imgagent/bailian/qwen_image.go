@@ -13,9 +13,13 @@ import (
 
 // GenerateImage 根据场景描述生成图片
 // 返回图片 URL
-func (c *Client) GenerateImage(ctx context.Context, sceneContent string) (string, error) {
+func (c *Client) GenerateImage(ctx context.Context, sceneContent string, summary string, roles []RoleInfo) (string, error) {
 	log := logger.FromContext(ctx)
 	log.Infof("Generating image for scene, content: %s", sceneContent)
+
+	// 构建完整的提示词
+	prompt := buildImagePrompt(sceneContent, summary, roles)
+	log.Infof("Full image prompt: %s", prompt)
 
 	// 构建请求
 	req := ImageGenerationRequest{
@@ -25,7 +29,7 @@ func (c *Client) GenerateImage(ctx context.Context, sceneContent string) (string
 				{
 					Role: "user",
 					Content: []ImageContent{
-						{Text: sceneContent},
+						{Text: prompt},
 					},
 				},
 			},
@@ -103,4 +107,26 @@ func (c *Client) GenerateImage(ctx context.Context, sceneContent string) (string
 
 	log.Infof("Image generated successfully, URL: %s", imageURL)
 	return imageURL, nil
+}
+
+func buildImagePrompt(sceneContent string, summary string, roles []RoleInfo) string {
+	var prompt string
+
+	if summary != "" {
+		prompt += fmt.Sprintf("小说概要：%s\n\n", summary)
+	}
+
+	if len(roles) > 0 {
+		prompt += "主要角色：\n"
+		for _, role := range roles {
+			if role.Appearance != "" {
+				prompt += fmt.Sprintf("- %s：%s\n", role.Name, role.Appearance)
+			}
+		}
+		prompt += "\n"
+	}
+
+	prompt += fmt.Sprintf("场景描述：%s", sceneContent)
+
+	return prompt
 }

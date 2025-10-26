@@ -11,6 +11,7 @@ import (
 type Config struct {
 	BaseURL        string `json:"base_url"`        // API 基础 URL
 	APIKey         string `json:"api_key"`         // API 密钥
+	SummaryPrompt  string `json:"summary_prompt"`  // 摘要提取 Prompt
 	RolePrompt     string `json:"role_prompt"`     // 角色提取 Prompt
 	ScenePrompt    string `json:"scene_prompt"`    // 场景生成 Prompt
 	ImageSize      string `json:"image_size"`      // 图片尺寸
@@ -40,6 +41,9 @@ func NewClient(config Config) (*Client, error) {
 	}
 
 	// 设置默认 Prompt
+	if config.SummaryPrompt == "" {
+		config.SummaryPrompt = defaultSummaryPrompt
+	}
 	if config.RolePrompt == "" {
 		config.RolePrompt = defaultRolePrompt
 	}
@@ -81,6 +85,19 @@ const defaultRolePrompt = `请仔细分析这篇小说，提取出所有主要�
         "appearance": "身材魁梧，浓眉大眼，面容刚毅"
     }
 ]`
+
+// 默认摘要提取 Prompt
+const defaultSummaryPrompt = `请为这篇小说生成一段简洁的摘要，用于辅助场景图片生成。
+
+要求：
+1. 摘要应包含：故事背景、主要情节线、核心冲突、整体风格/氛围
+2. 重点描述小说的视觉风格、时代背景、场景特点等有助于图片生成的信息
+3. 控制在 200-300 字以内
+4. 使用简洁、客观的语言
+5. 直接返回摘要文本，不要有其他说明或格式标记
+
+返回格式示例：
+这是一部现代都市悬疑小说，讲述了...`
 
 // 默认场景生成 Prompt
 const defaultScenePrompt = `请将以下章节内容拆分为 0-3 个关键场景，用于生成连环漫画。

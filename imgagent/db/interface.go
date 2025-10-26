@@ -18,6 +18,7 @@ type IDataBase interface {
 	UpdateDocument(ctx context.Context, id string, args *api.UpdateDocumentArgs) error
 	UpdateDocumentStatus(ctx context.Context, id string, status string) error
 	UpdateDocumentFileID(ctx context.Context, id string, fileID string) error
+	UpdateDocumentSummary(ctx context.Context, id string, summary string) error
 	DeleteDocument(ctx context.Context, id string) error
 	ListDocuments(ctx context.Context) ([]Document, error)
 	ListChapterReadyDocuments(ctx context.Context) ([]Document, error)
