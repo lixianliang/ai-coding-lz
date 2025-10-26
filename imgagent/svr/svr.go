@@ -1,12 +1,10 @@
 package svr
 
 import (
-	"errors"
 	"io"
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
 	"imgagent/bailian"
@@ -21,17 +19,8 @@ type Config struct {
 	Temp           string         `json:"temp"`
 	Storage        storage.Config `json:"storage"`
 	DB             dbutil.Config  `json:"db"`
-	Redis          RedisConfig    `json:"redis"`
 	BailianConfig  bailian.Config `json:"-"` // 从外部传入
 	DocumentConfig DocumentConfig `json:"-"` // 从外部传入
-}
-
-type RedisConfig struct {
-	DisableCluster bool     `json:"disable_cluster"`
-	ExpireSecs     int      `json:"expire_secs"`
-	Addrs          []string `json:"addrs"`
-	MasterName     string   `json:"master_name,omitempty"`
-	SentinelAddrs  []string `json:"sentinel_addrs,omitempty"`
 }
 
 type EmbeddingConfig struct {
@@ -43,7 +32,6 @@ type EmbeddingConfig struct {
 type Service struct {
 	conf          Config
 	db            db.IDataBase
-	redis         redis.UniversalClient
 	stg           *storage.Storage
 	bailianClient *bailian.Client
 	documentMgr   *DocumentMgr
@@ -70,23 +58,6 @@ func New(conf Config, bailianClient *bailian.Client) (*Service, error) {
 		return nil, err
 	}
 
-	if len(conf.Redis.Addrs) == 0 {
-		return nil, errors.New("invalid addrs")
-	}
-	var redisCli redis.UniversalClient
-	if conf.Redis.ExpireSecs == 0 {
-		conf.Redis.ExpireSecs = 120
-	}
-	if conf.Redis.DisableCluster {
-		redisCli = redis.NewClient(&redis.Options{
-			Addr: conf.Redis.Addrs[0],
-		})
-	} else {
-		redisCli = redis.NewClusterClient(&redis.ClusterOptions{
-			Addrs: conf.Redis.Addrs,
-		})
-	}
-
 	// 创建文档管理器
 	var docMgr *DocumentMgr
 	if conf.DocumentConfig.Enable {
@@ -108,7 +79,6 @@ func New(conf Config, bailianClient *bailian.Client) (*Service, error) {
 	return &Service{
 		conf:          conf,
 		db:            db,
-		redis:         redisCli,
 		stg:           stg,
 		bailianClient: bailianClient,
 		documentMgr:   docMgr,
