@@ -45,6 +45,7 @@
     },
     "document_mgr": {
         "enable": true,
+        "handle_role_interval_secs": 30,
         "handle_scene_interval_secs": 30,
         "handle_image_gen_interval_secs": 30
     }

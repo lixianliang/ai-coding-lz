@@ -13,6 +13,7 @@ const (
 	batchSize = 100
 
 	DocumentStatusChapterReady = "chapterReady"
+	DocumentStatusRoleReady    = "roleReady"
 	DocumentStatusSceneReady   = "sceneReady"
 	DocumentStatusImgReady     = "imgReady"
 )
@@ -155,6 +156,10 @@ func (db *Database) UpdateDocumentFileID(ctx context.Context, id string, fileID 
 
 func (db *Database) ListChapterReadyDocuments(ctx context.Context) ([]Document, error) {
 	return gorm.G[Document](db.db).Where("status = ?", DocumentStatusChapterReady).Order("created_at ASC").Find(ctx)
+}
+
+func (db *Database) ListRoleReadyDocuments(ctx context.Context) ([]Document, error) {
+	return gorm.G[Document](db.db).Where("status = ?", DocumentStatusRoleReady).Order("created_at ASC").Find(ctx)
 }
 
 func (db *Database) ListSceneReadyDocuments(ctx context.Context) ([]Document, error) {
