@@ -265,7 +265,7 @@ func (db *Database) ListScenesByChapter(ctx context.Context, chapterID string) (
 }
 
 func (db *Database) ListScenesByDocument(ctx context.Context, documentID string) ([]Scene, error) {
-	return gorm.G[Scene](db.db).Where("document_id = ?", documentID).Order("chapter_id ASC, `index` ASC").Find(ctx)
+	return gorm.G[Scene](db.db).Where("document_id = ?", documentID).Order("`index` ASC").Find(ctx)
 }
 
 func (db *Database) ListPendingImageScenes(ctx context.Context, documentID string) ([]Scene, error) {
