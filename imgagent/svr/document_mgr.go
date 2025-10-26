@@ -246,6 +246,7 @@ func (m *DocumentMgr) HandleDocumentScence(ctx context.Context, doc db.Document)
 	}
 
 	// 2. 为每个章节生成场景
+	sceneIndex := 0
 	for _, chapter := range chapters {
 		log.Infof("Generating scenes for chapter, chapterID: %s, index: %d", chapter.ID, chapter.Index)
 
@@ -263,18 +264,19 @@ func (m *DocumentMgr) HandleDocumentScence(ctx context.Context, doc db.Document)
 			sceneIDs := make([]string, 0, len(scenes))
 			now := time.Now()
 
-			for i, sceneContent := range scenes {
+			for _, sceneContent := range scenes {
 				sceneID := db.MakeUUID()
 				sceneIDs = append(sceneIDs, sceneID)
 				dbScenes = append(dbScenes, db.Scene{
 					ID:         sceneID,
 					ChapterID:  chapter.ID,
 					DocumentID: doc.ID,
-					Index:      i,
+					Index:      sceneIndex,
 					Content:    sceneContent,
 					CreatedAt:  now,
 					UpdatedAt:  now,
 				})
+				sceneIndex++
 			}
 
 			err = m.db.CreateScenes(ctx, dbScenes)
