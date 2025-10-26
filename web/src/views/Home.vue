@@ -49,7 +49,13 @@
             @click="goToScenes(work.id)"
           >
             <div class="work-cover">
-              <el-icon class="cover-icon"><Document /></el-icon>
+              <img 
+                v-if="work.summary_image_url" 
+                :src="work.summary_image_url" 
+                class="cover-image"
+                alt="封面"
+              />
+              <el-icon v-else class="cover-icon"><Document /></el-icon>
             </div>
             <div class="work-info">
               <h3 class="work-title">{{ work.name }}</h3>
@@ -360,11 +366,23 @@ onMounted(async () => {
         align-items: center;
         justify-content: center;
         margin-bottom: 16px;
+        overflow: hidden;
         
         .cover-icon {
           font-size: 48px;
           color: white;
         }
+        
+        .cover-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform $transition-normal;
+        }
+      }
+      
+      &:hover .cover-image {
+        transform: scale(1.1);
       }
       
       .work-info {
