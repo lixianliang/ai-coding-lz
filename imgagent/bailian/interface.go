@@ -9,4 +9,5 @@ type BailianInterface interface {
 	ExtractRoles(ctx context.Context, fileID string, summary string) ([]RoleInfo, error)
 	GenerateScenes(ctx context.Context, content string) ([]string, error)
 	GenerateImage(ctx context.Context, prompt string, summary string, roles []RoleInfo) (string, error)
+	GenerateTTS(ctx context.Context, text string) (string, error)
 }

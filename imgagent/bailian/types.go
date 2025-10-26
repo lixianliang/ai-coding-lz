@@ -117,3 +117,49 @@ type ImageUsage struct {
 	Height      int `json:"height"`
 	ImageCount  int `json:"image_count"`
 }
+
+// TTSRequest TTS 生成请求
+type TTSRequest struct {
+	Model string   `json:"model"`
+	Input TTSInput `json:"input"`
+}
+
+// TTSInput TTS 输入
+type TTSInput struct {
+	Text         string `json:"text"`
+	Voice        string `json:"voice"`
+	LanguageType string `json:"language_type"`
+}
+
+// TTSResponse TTS 生成响应
+type TTSResponse struct {
+	StatusCode int       `json:"status_code"`
+	RequestID  string    `json:"request_id"`
+	Code       string    `json:"code"`
+	Message    string    `json:"message"`
+	Output     TTSOutput `json:"output"`
+	Usage      TTSUsage  `json:"usage"`
+}
+
+// TTSOutput TTS 输出
+type TTSOutput struct {
+	Text         interface{} `json:"text"`
+	FinishReason string      `json:"finish_reason"`
+	Choices      interface{} `json:"choices"`
+	Audio        TTSAudio    `json:"audio"`
+}
+
+// TTSAudio TTS 音频信息
+type TTSAudio struct {
+	Data      string `json:"data"`
+	URL       string `json:"url"`
+	ID        string `json:"id"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
+// TTSUsage TTS 使用情况
+type TTSUsage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+	Characters   int `json:"characters"`
+}
