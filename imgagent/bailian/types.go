@@ -113,9 +113,9 @@ type ImageResponseItem struct {
 
 // ImageUsage 使用情况
 type ImageUsage struct {
-	Width       int `json:"width"`
-	Height      int `json:"height"`
-	ImageCount  int `json:"image_count"`
+	Width      int `json:"width"`
+	Height     int `json:"height"`
+	ImageCount int `json:"image_count"`
 }
 
 // TTSRequest TTS 生成请求
@@ -133,12 +133,11 @@ type TTSInput struct {
 
 // TTSResponse TTS 生成响应
 type TTSResponse struct {
-	StatusCode int       `json:"status_code"`
-	RequestID  string    `json:"request_id"`
-	Code       string    `json:"code"`
-	Message    string    `json:"message"`
-	Output     TTSOutput `json:"output"`
-	Usage      TTSUsage  `json:"usage"`
+	RequestID string    `json:"request_id"`
+	Code      string    `json:"code"`
+	Message   string    `json:"message"`
+	Output    TTSOutput `json:"output"`
+	Usage     TTSUsage  `json:"usage"`
 }
 
 // TTSOutput TTS 输出

@@ -65,11 +65,6 @@ func (c *Client) GenerateTTS(ctx context.Context, text string) (string, error) {
 		return "", fmt.Errorf("parse response failed: %w", err)
 	}
 
-	if ttsResp.StatusCode != 200 {
-		log.Errorf("TTS API returned error, code: %s, message: %s", ttsResp.Code, ttsResp.Message)
-		return "", fmt.Errorf("TTS API error: %s - %s", ttsResp.Code, ttsResp.Message)
-	}
-
 	if ttsResp.Output.Audio.URL == "" {
 		log.Errorf("Audio URL is empty, response: %s", string(respBody))
 		return "", fmt.Errorf("audio URL is empty")
